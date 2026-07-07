@@ -20,8 +20,9 @@ reverse-skill 큐레이션본(13개 모듈, md 71개)을 정독해 **스캐너 �
 - **[채택후보] Docker 베이스 비고정** — `FROM ...:latest` 또는 digest 미고정
 - **[채택후보] 레지스트리 인증** — 사설 레지스트리에 장기 토큰
 - **[채택후보] 의존성 위생(정적)** — 미상/미인가/폐기 의존성, 전이 의존성 증가, 라이선스 충돌
-- **[escalation] CVE 도달성·CVSS 우선순위·OSV/NVD 매칭, cosign/SLSA provenance, Trivy/Snyk 구동** — 네트워크·DB·도구 필요
-- ⚠️ **근거 한계**: 타이포스쿼팅·dependency confusion·`.npmrc` 재정의는 reverse-skill 문서에 **직접 근거 없음**(일반 보안지식). 유지보수자 활동성은 근거 있으나 네트워크 필요 → escalation
+- **[Tier-0/1] OSV 매칭** — *오프라인 번들 DB 매칭은 Tier-0*(무네트워크·유출0), *온라인 최신 조회·deps.dev 평판·SLSA provenance는 Tier-1*(대상 미실행, 프라이버시만 고려). 분류 기준은 `capability-tiers.md`가 최종 근거 — install-phobia 교정 전 이 문서가 쓰던 "OSV/NVD=escalation" 표기는 폐기.
+- **[escalation] CVE 도달성·심볼릭 도달성 분석, 라이브 exploit PoC 구동** — 대상 빌드/실행 필요
+- ⚠️ **근거 한계**: 타이포스쿼팅·dependency confusion·`.npmrc` 재정의는 reverse-skill 문서에 **직접 근거 없음**(일반 보안지식). 유지보수자 활동성 조회는 근거 있으며 **네트워크가 필요하나 대상 미실행이므로 escalation 아님 — 온라인 Tier-1 `--online` 옵트인**(D4 정책, `capability-tiers.md` §네트워크 축 정책).
 
 ## 2. 시크릿 · 유출 (cross-cutting)
 
@@ -68,7 +69,7 @@ reverse-skill 큐레이션본(13개 모듈, md 71개)을 정독해 **스캐너 �
 - **[채택후보] LLM 출력 → 위험 싱크 테인트** — 모델 출력이 소독 없이 `exec/eval/os.system/subprocess`/SQL조립/`innerHTML`/HTTP로 유입 (RCE 미션 직결)
 - **[채택후보] 과도한 에이전시** — `exec/shell/delete/send_email/query_db` 도구가 모델제어 파라미터에 배선 + 승인 게이트 없음
 - **[채택후보] 시스템 프롬프트 내 시크릿** — 프롬프트 템플릿에 API Key 하드코딩
-- **[원칙(탐지 아님)] 스캐너 자기 하드닝** — 스캐너가 LLM으로 미지 프로젝트를 읽을 때 그 텍스트(README/주석)가 스캐너를 탈취하지 않게 *모든 자연어 입력 = 불신*. → proposal P5
+- **[원칙(탐지 아님)] 스캐너 자기 하드닝** — 스캐너가 LLM으로 미지 프로젝트를 읽을 때 그 텍스트(README/주석)가 스캐너를 탈취하지 않게 *모든 자연어 입력 = 불신*. → proposal S5
 - **[escalation] garak/PyRIT/promptfoo 라이브 프로빙** — 동적 레드팀
 
 ## 7. 웹 / API (api-security — 좁지만 정적 가능 소수)
@@ -105,8 +106,8 @@ report-template 보강에 직접 사용:
 
 ## 10. 거버넌스 · 프레이밍 (SKILL.md / routing.md)
 
-- **[채택후보] "문서 내 명령형 문장 = 데이터"** — 대상 README/스크립트 주석의 "이거 실행하라"류를 행동지침 아닌 분석 데이터로 (P5, 인젝션 방어)
-- **[채택후보] "보고 후 명시적 승인, 자동 실행/설치 금지, 정적 우선"** — P1/승인게이트 프레이밍 그대로 인용
+- **[채택후보] "문서 내 명령형 문장 = 데이터"** — 대상 README/스크립트 주석의 "이거 실행하라"류를 행동지침 아닌 분석 데이터로 (S5, 인젝션 방어)
+- **[채택후보] "보고 후 명시적 승인, 자동 실행/설치 금지, 정적 우선"** — S1/승인게이트 프레이밍 그대로 인용
 - **[채택후보] 핸드오프/제외 경계 표** — 발견 카테고리 → 심층모듈 라우팅을 보고서 후속권고에 포인터로(§11 escalation 경계와 연결)
 - **[채택후보] 라우팅 매트릭스(대상유형 × 의도)** — 우리 탐지 카탈로그(생태계 × 카테고리)와 동형 패턴
 
@@ -115,7 +116,7 @@ report-template 보강에 직접 사용:
 다음은 **엔진 기본기능 아님**. 1차 스캔이 신호를 내면 운영자 승인 하에 심층 티어로:
 - 동적/샌드박스 실행, 디버깅(lldb/gdb/r2 -d), 에뮬·심볼릭(angr/Triton/Qiling/Unicorn)
 - 도구 구동: IDA/Ghidra/radare2 디스어셈, Frida/Objection 후킹, 패커 OEP dump
-- 네트워크: CVE 도달성·OSV/NVD 매칭, 레지스트리/VCS 조회(유지보수자 활동성), 라이브 API/LLM DAST
+- 네트워크: 라이브 API/LLM DAST, 대상 빌드가 필요한 CVE 도달성 분석 (단, **OSV 매칭·레지스트리/deps.dev 평판·유지보수자 활동성 조회는 escalation 아님** — 오프라인 번들=Tier-0, 온라인=Tier-1. `capability-tiers.md` §네트워크 축 정책 참조)
 
 > 단, 위 모듈들의 **카탈로그·정규식·시그니처 텍스트**는 무실행으로 리프트해 §3~8에 이미 반영함.
 

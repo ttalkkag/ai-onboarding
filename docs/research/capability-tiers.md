@@ -74,7 +74,7 @@
 | FLOSS / Detect It Easy | pipx/brew | 난독 문자열 추출·패커 식별 |
 | upx -d / xz·zstd -d | brew | 정적 언팩(매직바이트 식별 후). ⚠️ OEP dump만 escalation |
 
-### 의존성 인텔리전스 (네트워크 조회 — 기본 ON + `--offline` 옵트아웃)
+### 의존성 인텔리전스 (네트워크 조회 — 기본 오프라인, `--online` 옵트인. `../plan/decisions.md` D4)
 | 능력 | 소스 |
 |------|------|
 | deps.dev 보강 | 배포일(나이)·OpenSSF Scorecard·라이선스·repo stars·SLSA provenance |
@@ -97,13 +97,13 @@
 
 ---
 
-## 네트워크 축 정책 (P2 교정)
+## 네트워크 축 정책 (S2 교정)
 
-현 P2 "대상 관련 네트워크 접근 금지"는 install-phobia와 동형의 과잉제약. 두 가지를 분리:
+현 S2 "대상 관련 네트워크 접근 금지"는 install-phobia와 동형의 과잉제약. 두 가지를 분리:
 
 1. **대상-주도 네트워크 (금지)** — C2 콜백·postinstall fetch·런타임 비콘. **대상을 실행해야만 발생** → 불변식이 이미 자동으로 막음. 별도 규칙 불필요.
 2. **엔진-주도 메타데이터 조회 (허용)** — 대상의 선언 이름·버전을 공개 DB에 질의. 대상 미실행. 유일 리스크 = 프라이버시.
-   - **정책**: 기본 ON + `--offline`/`--no-network` 옵트아웃. 취약/악성은 **번들 OSV DB(Tier-0)로 1차** → 기본 동작 유출 0. deps.dev/registry 보강만 Tier-1 네트워크.
+   - **정책(D4 결정 기준선)**: **기본 오프라인(0 egress)** — 취약/악성은 **번들 OSV DB(Tier-0)로 1차**. deps.dev/registry 평판 보강만 **`--online` 옵트인**(Tier-1, 기본 OFF). 상세는 `../plan/decisions.md` D4.
    - 프라이버시 고지: "대상 의존성 이름·버전을 OSV/deps.dev/레지스트리에 전송" 명시 + 옵트아웃.
 
 > 한 줄: 금지할 것은 "대상이 네트워크에 나가는 것"(실행해야 가능 → 이미 막힘)이지 "엔진이 대상 메타데이터를 공개 DB에 묻는 것"이 아니다.
