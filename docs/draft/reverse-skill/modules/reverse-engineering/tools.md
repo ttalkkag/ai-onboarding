@@ -2,49 +2,49 @@
 
 ## 목차
 - [GDB](#gdb)
-  - [기본 명령어](#basic-commands)
-  - [PIE 바이너리 디버깅](#pie-binary-debugging)
-  - [원 라이너 자동화](#one-liner-automation)
-  - [기억검사](#memory-exmination)
+  - [Basic Commands](#basic-commands)
+  - [PIE 바이너리 디버깅](#pie-바이너리-디버깅)
+  - [One-liner Automation](#one-liner-automation)
+  - [Memory Examination](#memory-examination)
 - [Radare2](#radare2)
-  - [기본 세션](#basic-session)
-  - [r2pipe 자동화](#r2pipe-automation)
+  - [Basic Session](#basic-session)
+  - [r2pipe Automation](#r2pipe-automation)
 - [Ghidra](#ghidra)
-  - [헤드리스 분석](#headless-analytic)
-  - [복호화용 에뮬레이터](#emulator-for-decryption)
-  - [MCP 명령](#mcp-commands)
-- [유니콘 에뮬레이션](#unicorn-emulation)
-  - [기본설정](#basic-setup)
-  - [혼합 모드(64~32) 스위치](#mixed-mode-64-to-32-switch)
-  - [추적 훅 등록](#register-tracing-hook)
-  - [트랙 레지스터 변경 사항](#track-register-changes)
-- [파이썬 바이트코드](#python-bytecode)
+  - [Headless Analysis](#headless-analysis)
+  - [복호화용 에뮬레이터](#복호화용-에뮬레이터)
+  - [MCP Commands](#mcp-commands)
+- [Unicorn Emulation](#unicorn-emulation)
+  - [Basic Setup](#basic-setup)
+  - [혼합 모드(64~32) 스위치](#혼합-모드6432-스위치)
+  - [추적 후크 등록](#추적-후크-등록)
+  - [레지스터 변경 사항 추적](#레지스터-변경-사항-추적)
+- [Python Bytecode](#python-bytecode)
   - [Disassembly](#disassembly)
-  - [상수 추출](#extract-constants)
-  - [Pyarmor 정적 언팩(1샷)](#pyarmor-static-unpack-1shot)
-- [WASM 분석](#wasm-analyse)
-  - [C로 디컴파일](#decompile-to-c)
-  - [공통 패턴](#common-patterns)
-- [안드로이드 APK](#android-apk)
+  - [Extract Constants](#extract-constants)
+  - [Pyarmor 정적 언팩(1샷)](#pyarmor-정적-언팩1샷)
+- [WASM Analysis](#wasm-analysis)
+  - [C로 디컴파일](#c로-디컴파일)
+  - [Common Patterns](#common-patterns)
+- [Android APK](#android-apk)
   - [Extraction](#extraction)
-  - [주요 위치](#key-locations)
+  - [Key Locations](#key-locations)
   - [Search](#search)
   - [Flutter APK (Blutter)](#flutter-apk-blutter)
-  - [HarmonyOS HAP/ABC (abc-디컴파일러)](#harmonyos-hapabc-abc-decompiler)
-- [.NET 분석](#net-analytic)
+  - [HarmonyOS HAP/ABC (abc-디컴파일러)](#harmonyos-hapabc-abc-디컴파일러)
+- [.NET Analysis](#net-analysis)
   - [Tools](#tools)
-  - [2단계 XOR + AES-CBC 디코드 패턴(Codegate 2013)](#two-stage-xor--aes-cbc-decode-pattern-codegate-2013)
   - [NativeAOT](#nativeaot)
-- [팩형 바이너리](#packed-binaries)
+  - [2단계 XOR + AES-CBC 디코드 패턴(Codegate 2013)](#2단계-xor--aes-cbc-디코드-패턴codegate-2013)
+- [Packed Binaries](#packed-binaries)
   - [UPX](#upx)
-  - [커스텀 패커](#custom-packers)
+  - [Custom Packers](#custom-packers)
   - [PyInstaller](#pyinstaller)
 - [LLVM IR](#llvm-ir)
-  - [어셈블리로 변환](#convert-to-assemblies)
-- [RISC-V 이진 분석(EHAX 2026)](#risc-v-binary-analytic-ehax-2026)
-- [바이너리 닌자](#binary-ninja)
-- [dogbolt.org와의 디컴파일러 비교](#decompiler-comparison-with-dogboltorg)
-- [유용한 명령](#useful-commands)
+  - [어셈블리로 변환](#어셈블리로-변환)
+- [RISC-V 이진 분석(EHAX 2026)](#risc-v-이진-분석ehax-2026)
+- [Binary Ninja](#binary-ninja)
+- [dogbolt.org와의 디컴파일러 비교](#dogboltorg와의-디컴파일러-비교)
+- [Useful Commands](#useful-commands)
 
 동적 계측 도구(Frida, angr, lldb, x64dbg)에 대해서는 [tools-dynamic.md](tools-dynamic.md)를 참조하세요.
 
@@ -240,8 +240,10 @@ mu.hook_add(UC_HOOK_CODE, hook_rsi_changes)
 ```python
 import marshal, dis
 
+# Use the exact interpreter version identified from the pyc magic. marshal is
+# not safe for untrusted data, so do this only in a disposable environment.
 with open('file.pyc', 'rb') as f:
-    f.read(16)  # Skip header (varies by Python version)
+    f.read(16)  # Example for Python 3.7+; older header sizes differ
     code = marshal.load(f)
     dis.dis(code)
 ```
@@ -312,7 +314,7 @@ grep -r "flag\|CTF" decoded/
 strings decoded/classes*.dex | grep -i flag
 ```
 
-### 펄럭펄럭 APK (펄럭펄럭)
+### Flutter APK (Blutter)
 
 ```bash
 # Run Blutter on arm64 build
@@ -329,7 +331,7 @@ unzip app.hap -d hap_extracted/
 ```
 
 중요한 시작 모드:
-```bash
+```text
 # Use CLI entrypoint (avoid java -jar GUI mode)
 java -cp "./jadx-dev-all.jar" jadx.cli.JadxCLI [options] <input>
 ```
@@ -364,13 +366,13 @@ Notes:
 
 ### 2단계 XOR + AES-CBC 디코드 패턴(Codegate 2013)
 
-**패턴:**.NET 바이너리는 XOR 디코딩 후 AES-256-CBC 암호 해독을 수행하는 암호화된 바이트 배열을 저장합니다. 동일한 키 값이 AES 키와 IV로 사용됩니다.
+**패턴:** .NET 바이너리는 XOR 디코딩 후 CBC 복호화를 수행하는 암호화된 바이트 배열을 저장할 수 있습니다. 키·IV와 `RijndaelManaged.BlockSize`를 디컴파일 결과에서 각각 확인해야 합니다.
 
 **Steps:**
 1. 바이너리에서 하드코딩된 바이트 배열 및 키 문자열 추출(dnSpy/ILSpy)
 2. 각 바이트를 XOR합니다(다중 패스일 수 있음, 예: `0x25`, `0x58`, 단일 `0x7D`와 동일)
 3. XOR 결과를 Base64로 디코딩합니다.
-4. AES-256-CBC는 추출된 키를 키와 IV로 사용하여 `RijndaelManaged`로 복호화합니다.
+4. AES-256-CBC라면 32바이트 키와 16바이트 IV를 원본 코드의 파생 방식대로 복원합니다.
 
 ```python
 from Crypto.Cipher import AES
@@ -384,13 +386,14 @@ for i in range(len(data)):
 # Step 2: Base64 decode
 ct = b64decode(bytes(data))
 
-# Step 3: AES-256-CBC decrypt (same value for key and IV)
-key = b"9e2ea73295c7201c5ccd044477228527"  # Padded to 32 bytes
-cipher = AES.new(key, AES.MODE_CBC, iv=key)
+# Step 3: AES-256-CBC decrypt
+key = b"9e2ea73295c7201c5ccd044477228527"  # 32 ASCII bytes in this case
+iv = b"0123456789abcdef"                    # Extract/derive as in the target
+cipher = AES.new(key, AES.MODE_CBC, iv=iv)
 plaintext = cipher.decrypt(ct)
 ```
 
-**주요 정보:**.NET 디컴파일에 `RijndaelManaged`가 나타나면 Key와 IV가 동일한 값으로 설정되어 있는지 확인하세요. 이는 일반적인 CTF 패턴입니다. XOR 단계는 실제 암호화 이전에 간단한 난독화 계층 역할을 하는 경우가 많습니다.
+**주요 정보:** .NET의 `RijndaelManaged`는 AES와 다른 블록 크기를 허용했던 구현입니다. 블록 크기가 128비트가 아니면 PyCryptodome의 `AES`로 그대로 재현할 수 없습니다. AES-CBC의 IV는 항상 16바이트이며, XOR 단계는 실제 암호화 이전의 난독화 계층일 수 있습니다.
 
 ---
 
@@ -432,18 +435,22 @@ gcc -c task.s -o file.o
 **캡스톤을 이용한 분해:**
 ```python
 from capstone import *
+from elftools.elf.elffile import ELFFile
 
 with open('binary', 'rb') as f:
-    code = f.read()
+    elf = ELFFile(f)
 
-# RISC-V 64-bit with compressed instruction support
-md = Cs(CS_ARCH_RISCV, CS_MODE_RISCVC | CS_MODE_RISCV64)
-md.detail = True
+    # RISC-V 64-bit with compressed instruction support
+    md = Cs(CS_ARCH_RISCV, CS_MODE_RISCVC | CS_MODE_RISCV64)
+    md.detail = True
 
-# Disassemble from entry point (check ELF header for e_entry)
-TEXT_OFFSET = 0x10000  # typical for static RISC-V
-for insn in md.disasm(code[TEXT_OFFSET:], TEXT_OFFSET):
-    print(f"0x{insn.address:x}:\t{insn.mnemonic}\t{insn.op_str}")
+    # File offsets and virtual addresses are different fields. Let pyelftools
+    # extract each executable PT_LOAD segment and disassemble at its p_vaddr.
+    for segment in elf.iter_segments():
+        if segment['p_type'] != 'PT_LOAD' or not (segment['p_flags'] & 1):
+            continue
+        for insn in md.disasm(segment.data(), segment['p_vaddr']):
+            print(f"0x{insn.address:x}:\t{insn.mnemonic}\t{insn.op_str}")
 ```
 
 **일반적인 RISC-V 패턴:**
@@ -466,7 +473,7 @@ for insn in md.disasm(code[TEXT_OFFSET:], TEXT_OFFSET):
 - 무차별 대입 타이밍(rdtime 명령어)
 - 증분 키를 사용한 XOR 복호화: `decrypted[i] = enc[i] ^ (key & 0xFF) ^ 0xA5; key += 7`
 
-**에뮬레이션:** `qemu-riscv64 -L /usr/riscv64-linux-gnu/./binary` (크로스 툴체인 시스템 루트 필요)
+**에뮬레이션:** `qemu-riscv64 -L /usr/riscv64-linux-gnu/ ./binary` (크로스 툴체인 시스템 루트 필요)
 
 ---
 
@@ -492,15 +499,17 @@ for func in bv.functions:
 
 **커뮤니티 플러그인:** 플러그인 관리자(Ctrl+Shift+P → "플러그인 관리자")를 통해 사용할 수 있습니다.
 
-**무료 버전:** https://binary.ninja/free/(클라우드 기반, 제한된 기능).
+**무료 옵션:** https://binary.ninja/free/ — 로컬 Free 앱은 비상업용이며 아키텍처/API가 제한되고, Cloud는 바이너리를 Vector 35에 업로드해야 하므로 기밀 샘플에는 사용하지 마세요.
 
-**Ghidra의 장점:** 더 빠른 시작, 더 깔끔한 IL 표현, 더 나은 Python API 스크립팅.
+**Binary Ninja의 일반적인 장점:** 빠른 대화형 분석과 여러 IL 표현, Python API. 구체적인 분석 품질은 아키텍처·바이너리·제품 버전에 따라 Ghidra 등과 비교하세요.
 
 ---
 
 ## dogbolt.org와의 디컴파일러 비교
 
 **dogbolt.org**는 동일한 바이너리에서 여러 디컴파일러를 동시에 실행하고 결과를 나란히 표시합니다.
+
+업로드한 바이너리는 외부 서비스로 전송됩니다. 기밀·악성·라이선스 제한 artifact는 올리지 말고 서비스의 현재 보존·공개 범위를 확인하세요.
 
 **지원되는 디컴파일러:** Hex-Rays(IDA), Ghidra, Binary Ninja, angr, RetDec, Snowman, dewolf, Reko, Relyze.
 

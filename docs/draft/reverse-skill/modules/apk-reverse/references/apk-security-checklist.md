@@ -11,7 +11,7 @@
 
 ```text
 □ android:debuggable="true" → 디버그 가능(프로덕션 환경에는 표시되지 않아야 함)
-□ android:allowBackup="true" → 데이터 백업 및 추출 가능
+□ android:allowBackup="true" → OS·`targetSdk`·백업 전송 방식별 실제 포함 범위 확인
 □ android:exported="true" → 노출된 구성요소 Activity/Service/Receiver/Provider
 □ 사용자 정의 권한 보호수준 → 정상 여부(서명이어야 함)
 □ 인텐트 필터의 방식 → 딥링크 하이재킹 가능 여부 맞춤설정
@@ -77,9 +77,9 @@ frida-trace -U -f com.target.app -i 'Java_*'
 
 ### Objection 빠른 명령
 
-```bash
+```text
 # 연결하다
-objection -g com.target.app explore
+objection -n com.target.app start
 
 # 일반적인 명령
 android hooking list activities
@@ -138,9 +138,9 @@ sqlite connect <db_path>         # 데이터베이스에 연결
 |------|------|---------|
 | SharedPreferences | 토큰/비밀번호를 일반 텍스트로 저장| `adb shell cat /data/data/pkg/shared_prefs/*.xml` |
 | SQLite 데이터베이스|암호화되지 않은 민감한 데이터| `adb pull /data/data/pkg/databases/` |
-| 외부 저장소| 모든 애플리케이션에서 읽을 수 있음| `adb shell ls /sdcard/Android/data/pkg/` |
-| 애플리케이션 로그| 누수 디버깅 정보| `adb 로그캣\| grep pkg` |
-| 백업 파일| 허용백업=true| `adb backup -f backup.ab pkg` |
+| 외부/공유 저장소| 공유 컬렉션과 오래된 OS·권한 모델에서 노출 위험; Android 11+ 앱 전용 외부 디렉터리는 다른 앱이 접근할 수 없음 | 대상 OS·`targetSdk`·저장 위치별 권한을 확인 |
+| 애플리케이션 로그| 누수 디버깅 정보| `adb logcat | grep pkg` |
+| 백업 데이터| OS 버전과 `targetSdk`별 백업 규칙이 다름| 매니페스트의 `allowBackup`, `fullBackupContent`, `dataExtractionRules`와 실제 백업 동작을 확인 |
 | 키보드 캐시| 기록 입력| `inputType`가 `textPassword`인지 확인하세요.|
 | 스크린샷 보호| 민감한 페이지는 스크린샷으로 찍힐 수 있습니다| 확인 `FLAG_SECURE`|
 
@@ -149,7 +149,7 @@ sqlite connect <db_path>         # 데이터베이스에 연결
 | 계획| 보안| 설명|
 |------|--------|------|
 | SharedPreferences 일반 텍스트| ❌ | 루트 바로 다음에 읽기|
-| EncryptedSharedPreferences | ✓ |AndroidX 보안 라이브러리|
+| EncryptedSharedPreferences | ⚠️ | AndroidX Security 1.1.0부터 deprecated; 신규 설계는 위협 모델에 맞춰 플랫폼 저장소와 Android Keystore API를 별도로 검토 |
 | SQLCipher | ✓ | 암호화된 SQLite|
 | Android Keystore | ✓✓ | 하드웨어 수준의 키 보호|
 | 맞춤형 AES 암호화| ⚠️ | 키 관리에 따라 다름|
@@ -174,7 +174,7 @@ sqlite connect <db_path>         # 데이터베이스에 연결
 ### 테스트 페이로드
 
 ```bash
-# 울트라바이어스 테스트
+# 수평 권한 상승(IDOR) 테스트
 curl -H "Authorization: Bearer USER_A_TOKEN" \
      "https://api.target.com/users/USER_B_ID/profile"
 
@@ -183,11 +183,9 @@ curl -H "Authorization: Bearer USER_A_TOKEN" \
 # 2. 로그아웃
 # 3. 이전 토큰으로 요청 → 401을 반환해야 함
 
-# SMS 인증코드 폭파
-for code in $(seq 0000 9999); do
-    curl -X POST "https://api.target.com/verify" \
-         -d "phone=13800138000&code=$code"
-done
+# SMS 인증 제한 검증
+# 승인된 테스트 계정에서 소수의 잘못된 코드를 보내고,
+# 서버의 속도 제한·잠금·재사용 방지·감사 로그가 동작하는지 확인합니다.
 ```
 
 ---
@@ -197,7 +195,7 @@ done
 | 보호 조치| 탐지 방법| 우회 난이도|
 |---------|---------|---------|
 | ProGuard 난독화| jadx는 클래스 이름이 a/b/c인지 확인합니다.| 낮음(이름 바꾸기)|
-| 문자열 암호화| 복호화 기능 검색, 일반 텍스트 획득을 위한 Hook| 안으로|
+| 문자열 암호화| 복호화 기능 검색, 일반 텍스트 획득을 위한 Hook| 중간|
 | 디버깅 방지|디버거를 연결해 보세요| 중간(Frida 우회 가능)|
 | 루트 감지| 루팅된 기기에서 실행| 중간(일반 스크립트 우회)|
 | 에뮬레이터 감지| 에뮬레이터에서 실행| 낮음-중간|

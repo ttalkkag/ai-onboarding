@@ -1,44 +1,42 @@
-# research — 리서치 기반
+# research — 탐지 근거와 후보 기술
 
-`plan/`의 기획이 딛고 선 **근거**를 모은다. (구 `references/`에서 재배치)
+> 이 디렉터리는 제품 정책의 정본이 아니다. 충돌하면 루트 `README.md`, `CONTEXT.md`, `../plan/`을 따른다.
 
 ## 인덱스
 
 | 문서 | 내용 |
 |------|------|
-| `threat-catalog.md` | 위협 카탈로그 — 스캐너 자동 검사 항목 + 사람 검토 항목 + 사례 교훈 |
-| `reverse-skill-harvest.md` | reverse-skill 13개 모듈 발굴 — 가져올 탐지 지식(채택후보/escalation) |
-| `capability-tiers.md` | **Tier-0/1/Escalation 분류** — install-phobia 교정, 정적 도구·의존성 인텔 지형 |
+| `threat-catalog.md` | 작업별 HIGH/LOW/INFO 규칙 후보 |
+| `osv.md` | OSV·악성 패키지 데이터의 의미, 한계와 후속 도입 선택지 |
+| `reverse-skill-harvest.md` | 수집 문서에서 가져올 수 있는 정적 탐지 아이디어 |
+| `capability-tiers.md` | 공용 로컬 코어와 선택 정적 도구 후보 |
 
-> 원자료(`reverse-skill/`)는 `../draft/reverse-skill/`에 보존 — research/는 인용·인덱싱만. 짧은 출처 표기(예: `tools.md §…`)는 그 `modules/` 이하를 가리킨다. (구 reverse-skill 조사 보고서 2건은 R3·R4에 **통합·정정**되어 제거됨)
+원자료는 `../draft/`에 보존한다. 원자료의 명령·도구·플로우는 검증 전까지 제품 기능이 아니다.
 
-## 핵심 결론 (기획을 결정한 리서치 요지)
+## 현재 결론
 
-### R1 · 위협은 하나다
-"모르는 외부 프로젝트를 내려받아 **의심 없이 실행**" — 설치/빌드 한 번이 라이프사이클 훅·빌드·CI로
-원격 코드를 자동 실행. 대표 사례: LinkedIn 채용 사칭 백도어. 엔진은 이 단일 위협의 **설치 전 차단**에 집중.
+### R1. 제품은 AI CLI 작업 게이트다
 
-### R2 · 2-페이즈 신뢰 모델 (범위 경계)
-- **운영자 도구**(내가 의도해서 미리 설치한 스캐너·분석 도구) = **검증 대상 아님**.
-- **모르는 대상**(내려받아 실행하려는 외부 프로젝트) = **검증 지점**.
-- 이 구분이 엔진의 적용 경계이자, "외부 분석 도구를 운영자가 깔아 쓰는 것"이 정책에 모순되지 않는 근거.
+Secure Onboard는 프로젝트 전체를 `안전/위험`으로 인증하지 않는다. Claude Code·Codex가 계획한 구체 작업을 실행 직전에 검사해 `HIGH`, `LOW`, `INFO`로 판정한다. HIGH만 AI 자동 실행을 차단한다.
 
-### R3 · reverse-skill 실측 조사 (실제 스크립트 검증)
-원본 `zhaoxuya520/reverse-skill` 스크립트를 읽기 전용으로 직접 확인한 결과:
-- `bootstrap-reverse.sh`(613줄)는 **운영자 도구 설치기**(jadx/frida/r2…) — 대상 코드 미접촉 → R2상 위협 아님.
-  경로 안전장치(`$TOOLS_ROOT` 밖 삭제 거부) 보유, `curl\|sh`·raw-IP 없음(`curl -o`→추출, `git clone https`).
-- 대상 실행에 닿는 건 **동적 스크립트뿐**: `frida-run.sh`(라이브 후킹), `rebuild-sign-install.sh --install`(adb 배포)
-  → 이건 온보딩 플로우의 "승인+샌드박스"가 커버.
-- 분석 스크립트에 **자동 설치(`ensure_tool`→bootstrap)**가 내장 → 이는 *공급망 위협*이 아니라
-  *승인 게이트 UX*와 충돌. 도입 시 "자동 설치 → 승인 호출"로 디팽하면 됨.
-- **정정**: 스크립트 제외의 진짜 이유는 "위협"이 아니라 **플랫폼(Win/Kali) + 범위(공격 payload) + 검증표면 최소화 편의**.
+### R2. 실제 tool call과 대상 입력을 불신한다
 
-### R4 · 도구 지형 → "자체 휴리스틱" 결정 (안전이 아니라 설계 선택)
-Semgrep·OSV-Scanner·Trivy·npm audit 등 검증된 OSS는 **대상을 실행하지 않는 정적 분석**이라,
-엔진이 이를 호출해도 안전 불변식(대상 불간섭)에 위배되지 않는다 — 즉 오케스트레이터도 "안전"하다.
-그럼에도 1차 엔진을 **자체 휴리스틱**으로 두는 이유는 **자체완결·이식성**(운영자 사전설치 불필요)을
-외부 도구의 높은 탐지품질보다 우선하는 **설계 선택**이다. 고품질 외부 도구 심화는 운영자가 별도 수행.
+- 대상 코드·설정·자연어 지시·도구 경로는 신뢰하지 않는다.
+- 실제 판정 입력은 PreToolUse가 받은 tool name·command·argv·cwd다.
+- 검사 코어와 선택 도구는 출처·버전·무결성·환경 주입·자원 제한을 검증한다.
 
-> ⚠️ 교정 이력: 과거 이 결정을 "제로 의존(엔진이 아무것도 설치 안 함)" 안전원칙으로 잘못 정당화했음.
-> 진짜 안전 불변식은 **대상 불간섭** 하나이며, 엔진 자신의 설치/의존성은 운영자 도구라 자유다(R2).
-> "엔진 vs 대상" 혼동이 그간 오류의 뿌리였다.
+### R3. 수집한 reverse-skill과 `scan.sh`는 참고 코퍼스다
+
+설치 훅, 난독화, 유출 sink, 악성 패키지와 바이너리 IOC 같은 지식만 규칙 후보로 가져온다. 기존 공유 스킬·이분 판정·MED·자동 설치·동적 실행 절차는 현재 제품 계약이 아니다.
+
+### R4. AI가 외부 프로젝트를 처리할 수 있다
+
+외부 코드·파일을 Claude Code·Codex가 읽는 것은 지원 범위다. 로컬 CLI는 로컬 모델이나 무전송을 뜻하지 않으며 공급자 전송·보존은 각 클라이언트와 계정 정책을 따른다. Secure Onboard는 별도 제3자 분석 서비스 전송과 로컬 로그의 비밀값 노출을 추가하지 않는다.
+
+### R5. 공용 코어와 두 플러그인 어댑터를 사용한다
+
+공유 저장소 스킬 심볼릭 링크 대신 공용 로컬 코어와 Claude Code·Codex별 plugin manifest/hook adapter를 사용한다. 현재 권장 배포안은 사용자 영역에 공용 코어를 한 번 설치하고 프로젝트 모드는 사용자 소유 registry로 활성화하는 방식이다. 실제 프로젝트별 plugin/package 설치까지 제공할지는 M1 전 사용자 확인 사항이다.
+
+### R6. M0로 hook 경계를 먼저 검증한다
+
+지금 시작 가능한 구현은 두 CLI의 native hook payload와 deny·continue·result·Stop 동작을 고정 sentinel로 확인하는 M0 tracer-bullet이다. M1 범위는 npm 설치, 로컬 파일 열기와 명시적 read-only scan으로 확정했다. EICAR는 고정 commit의 `standard/eicar.com.txt` 단일 파일을 격리된 opt-in signature/cache fixture로만 사용한다. container 분석, OSV/MAL 평판 데이터, 다중 생태계, Docker와 광범위 정적 분석기는 M2 이후 검토한다.

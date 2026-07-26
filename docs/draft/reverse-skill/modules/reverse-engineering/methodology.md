@@ -12,6 +12,8 @@ metadata:
 
 RE 과제에 대한 빠른 참조입니다. 자세한 기술은 지원 파일을 참조하세요.
 
+> **안전 및 권한 범위:** 본인이 소유하거나 명시적으로 분석 허가를 받은 대상만 다루세요. 알 수 없는 바이너리는 적대적이라고 가정하고, 스냅샷 가능한 격리 VM에서 비밀정보·공유 폴더·외부 네트워크를 제거한 뒤 분석하세요. Docker와 qemu-user는 호스트 커널을 공유하므로 악성코드 실행의 보안 경계가 아닙니다. 아래 실행 명령을 호스트에서 그대로 복사해 실행하지 마세요.
+
 ## Prerequisites
 
 **Python 패키지(모든 플랫폼):**
@@ -70,14 +72,12 @@ r2pm -ci r2ghidra   # Native Ghidra decompiler for radare2
 
 ## Problem-Solving Workflow
 
-1. **문자열 추출로 시작** - 많은 쉬운 과제에는 일반 텍스트 플래그가 있습니다.
-2. **ltrace/strace** 시도 - 동적 분석에서는 반전 없이 플래그가 표시되는 경우가 많습니다.
-3. **Frida 후킹을 시도하세요** - 후킹 strcmp/memcmp을 사용하여 반전 없이 예상 값을 캡처하세요.
-4. **angr 사용해 보세요** - 기호 실행으로 많은 플래그 검사기가 자동으로 해결됩니다.
-5. **Qiling 사용해 보기** - 외부 아치 바이너리를 에뮬레이트하거나 아티팩트 없이 강력한 안티 디버그를 우회합니다.
-6. **맵 제어 흐름** 실행 수정 전
-7. 스크립트(r2pipe, Frida, angr, Python)를 통해 **수동 프로세스 자동화**
-8. 디컴파일러 출력을 비교하여 **가정 검증**(병렬의 경우 dogbolt.org)
+1. `file`, 헤더, import, 문자열, 보호 속성을 정적으로 확인합니다.
+2. 진입점·주요 비교·데이터 참조를 따라 **제어 흐름을 매핑**합니다.
+3. 디컴파일러 출력을 비교하고 정적 근거로 **가정을 검증**합니다.
+4. 정적으로 답할 수 없는 질문만 정의한 뒤, 앞의 안전 전제를 충족하는 격리 VM에서 `strace`/`ltrace` 또는 디버거를 사용합니다.
+5. 필요할 때 Frida·Qiling·angr를 각각 후킹·OS 에뮬레이션·기호 실행 질문에 맞춰 적용하고, 모델링 누락과 에뮬레이션 차이를 검증합니다.
+6. 반복 작업만 r2pipe, Frida, angr, Python 스크립트로 자동화합니다.
 
 ## 빠른 승리(먼저 시도해 보세요!)
 
@@ -87,7 +87,7 @@ strings binary | grep -E "flag\{|CTF\{|pico"
 strings binary | grep -iE "flag|secret|password"
 rabin2 -z binary | grep -i "flag"
 
-# Dynamic analysis - often captures flag directly
+# Dynamic analysis: only in the isolated environment described above
 ltrace ./binary
 strace -f -s 500 ./binary
 
@@ -104,7 +104,7 @@ echo "test" | ./binary
 ```bash
 file binary           # Type, architecture
 checksec --file=binary # Security features (for pwn)
-chmod +x binary       # Make executable
+readelf -h -l binary  # ELF class, entry point, program headers
 ```
 
 ## 메모리 덤핑 전략
@@ -118,11 +118,11 @@ chmod +x binary       # Make executable
 ## GDB PIE 디버깅
 
 PIE 바이너리는 기본 주소를 무작위로 지정합니다. 상대 중단점을 사용합니다.
-```bash
+```text
 gdb ./binary
 start                    # Forces PIE base resolution
-b *main+0xca            # Relative to main
-run
+b *main+0xca             # Relative to main
+continue
 ```
 
 ## 비교 방향 (중요!)

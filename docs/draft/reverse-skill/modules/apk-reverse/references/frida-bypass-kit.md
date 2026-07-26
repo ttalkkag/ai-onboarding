@@ -1,11 +1,11 @@
-# Frida 우회 키트 — Android 범용 보안 우회 프레임워크
+# Frida 우회 키트 — Android 다층 보안 우회 참고
 
-> 출처: [FridaBypassKit](https://github.com/okankurtuluss/FridaBypassKit)(2025)
+> 출처: [FridaBypassKit](https://github.com/okankurtuluss/FridaBypassKit), 2025
 > 적용 가능한 시나리오: APK 동적 분석에는 루트 감지 우회, SSL 고정, 시뮬레이터 감지 및 디버깅 방지가 필요합니다.
 
 ## 개요
 
-FridaBypassKit은 네 가지 주요 우회 기능을 통합한 Frida 스크립트입니다. 특정 앱에 맞게 맞춤설정할 필요가 없으며 즉시 사용할 수 있습니다.
+FridaBypassKit은 네 가지 주요 우회 패턴을 묶은 Frida 스크립트입니다. 탐지 구현·프레임워크·OS·Frida 버전에 따라 적용 범위가 달라지므로, 승인된 테스트 앱에서 필요한 계층만 선택하고 대상별로 검증·조정해야 합니다.
 
 ## 4가지 주요 우회 기능
 
@@ -53,8 +53,8 @@ frida -U -f com.example.app -l FridaBypassKit.js
 
 | 프로젝트| 특징| 링크|
 |------|------|------|
-| httptoolkit/frida-interception-and-unpinning | 모든 HTTPS 트래픽 직접 MitM| [GitHub](https://github.com/httptoolkit/frida-interception-and-unpinning)|
-| 0xCD4/SSL-bypass | 일반 비맞춤형 SSL 우회| [GitHub](https://github.com/0xCD4/SSL-bypass)|
+| httptoolkit/frida-interception-and-unpinning | 여러 Java/native TLS 스택의 프록시·인증서 계측(대상별 검증 필요)| [GitHub](https://github.com/httptoolkit/frida-interception-and-unpinning)|
+| 0xCD4/SSL-bypass | 일반적인 SSL 검증 지점용 스크립트| [GitHub](https://github.com/0xCD4/SSL-bypass)|
 | incogbyte/ssl-bypass 요지| 일반적인 SSL 고정 방법 우회| [요지](https://gist.github.com/incogbyte/1e0e2f38b5602e72b1380f21ba04b15e)|
 | Zero3141/Frida-OkHttp-Bypass | 특히 OkHttp CertificatePinner용| [GitHub](https://github.com/Zero3141/Frida-OkHttp-Bypass)|
 
@@ -67,4 +67,4 @@ frida -U -f com.example.app -l FridaBypassKit.js
 3. 앱에서 에뮬레이터 실행 거부를 감지 → 에뮬레이터 감지 우회 활성화
 4. Frida 추가 후 앱이 다운됨 → 디버그 감지 우회 활성화
 
-권장 조합: 먼저 전체 FridaBypassKit을 실행한 다음 대상 조정을 수행합니다.
+권장 순서: 관찰로 실제 탐지 계층을 확인한 뒤 해당 기능만 활성화하고, 앱 충돌·무결성 검사·누락된 네이티브 검증 지점을 다시 확인합니다.

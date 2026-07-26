@@ -1,22 +1,22 @@
 # CTF Reverse - 플랫폼 및 프레임워크별 기술
 
 ## 목차
-- [Rust serde_json 스키마 복구](#rust-serde_json-schema-recovery)
-- [Android JNI RegisterNatives 난독화(HTB WonderSMS)](#android-jni-registernatives-obfuscation-htb-wondersms)
-- [/proc/self/maps을 통한 Android DEX 런타임 바이트코드 패치(Google CTF 2017)](#android-dex-runtime-bytecode-patching-via-procselfmaps-google-ctf-2017)
-- [새 프로젝트에서 Android 네이티브.so 로딩 우회(Codegate CTF 2018)](#android-native-so-loading-bypass-in-new-project-codegate-ctf-2018)
-- [Frida Firebase Cloud Functions 우회(BSidesSF 2026)](#frida-firebase-cloud-functions-bypass-bsidessf-2026)
-- [Verilog/Hardware 리버스 엔지니어링(srdnlenCTF 2026)](#veriloghardware-reverse-engineering-srdnlenctf-2026)
-- [접두사별 해시 반전(Nullcon 2026)](#prefix-by-prefix-hash-reversal-nullcon-2026)
-- [Ruby/Perl 다중 언어 제약 조건 만족도(BearCatCTF 2026)](#rubyperl-polyglot-constraint-satisfaction-bearcatctf-2026)
-- [Electron 앱 + 네이티브 바이너리 반전(RootAccess2026)](#electron-app--native-binary-reversing-rootaccess2026)
-- [Node.js npm 패키지 런타임 검사(RootAccess2026)](#nodejs-npm-package-runtime-introspection-rootaccess2026)
-- [Frida Android 인증서 고정 우회(h1702ctf 2017)](#frida-android-certificate-pinning-bypass-h1702ctf-2017)
-- [Android 안티 디버그: TracerPid, su 바이너리, 시스템 속성(h1702ctf 2017)](#android-anti-debug-tracerpid-su-binary-system-properties-h1702ctf-2017)
-- [Android 로그 기반 키 추출(HackIT 2017)](#android-log-based-key-extraction-hackit-2017)
-- [메모리 덤프 및 Smali 패치를 통한 네이티브 JNI 키 추출(HackIT 2017)](#native-jni-key-extraction-via-memory-dump-and-smali-patching-hackit-2017)
-- [IBM AS/400 SAVF 파일 EBCDIC 디코딩(EKOPARTY 2017)](#ibm-as400-savf-file-ebcdic-decoding-ekoparty-2017)
-- [Intel SGX Enclave 리버스 엔지니어링(Pwn2Win 2017)](#intel-sgx-enclave-reverse-engineering-pwn2win-2017)
+- [Rust serde_json 스키마 복구](#rust-serde_json-스키마-복구)
+- [Android JNI RegisterNatives 난독화(HTB WonderSMS)](#android-jni-registernatives-난독화htb-wondersms)
+- [/proc/self/maps를 통한 Android DEX 런타임 바이트코드 패치(Google CTF 2017)](#procselfmaps를-통한-android-dex-런타임-바이트코드-패치google-ctf-2017)
+  - [새 프로젝트에서 Android 네이티브.so 로드 우회(Codegate CTF 2018)](#새-프로젝트에서-android-네이티브so-로드-우회codegate-ctf-2018)
+- [Frida Firebase Cloud Functions 우회(BSidesSF 2026)](#frida-firebase-cloud-functions-우회bsidessf-2026)
+- [Verilog/Hardware 리버스 엔지니어링(srdnlenCTF 2026)](#veriloghardware-리버스-엔지니어링srdnlenctf-2026)
+- [접두사별 해시 반전(Nullcon 2026)](#접두사별-해시-반전nullcon-2026)
+- [Ruby/Perl 다중 언어 제약 조건 만족도(BearCatCTF 2026)](#rubyperl-다중-언어-제약-조건-만족도bearcatctf-2026)
+- [Electron 앱 + 네이티브 바이너리 반전(RootAccess2026)](#electron-앱--네이티브-바이너리-반전rootaccess2026)
+- [Node.js npm 패키지 런타임 검사(RootAccess2026)](#nodejs-npm-패키지-런타임-검사rootaccess2026)
+- [Frida Android 인증서 고정 우회(h1702ctf 2017)](#frida-android-인증서-고정-우회h1702ctf-2017)
+- [Android 안티 디버그: TracerPid, su 바이너리, 시스템 속성(h1702ctf 2017)](#android-안티-디버그-tracerpid-su-바이너리-시스템-속성h1702ctf-2017)
+- [Android 로그 기반 키 추출(HackIT 2017)](#android-로그-기반-키-추출hackit-2017)
+- [메모리 덤프 및 Smali 패치를 통한 네이티브 JNI 키 추출(HackIT 2017)](#메모리-덤프-및-smali-패치를-통한-네이티브-jni-키-추출hackit-2017)
+- [IBM AS/400 SAVF 파일 EBCDIC 디코딩(EKOPARTY 2017)](#ibm-as400-savf-파일-ebcdic-디코딩ekoparty-2017)
+- [Intel SGX Enclave 리버스 엔지니어링(Pwn2Win 2017)](#intel-sgx-enclave-리버스-엔지니어링pwn2win-2017)
 
 핵심 언어 반전(Python, BF/esolangs, DOS, OPAL)에 대해서는 [languages.md](languages.md)를 참조하세요.
 Go 및 Rust 바이너리 리버싱에 대해서는 [languages-compiled.md](languages-compiled.md)를 참조하세요.
@@ -44,7 +44,7 @@ Go 및 Rust 바이너리 리버싱에 대해서는 [languages-compiled.md](langu
 
 ## Android JNI RegisterNatives 난독화(HTB WonderSMS)
 
-**패턴:** Android 앱은 `System.loadLibrary()`를 사용하여 기본 라이브러리를 로드하지만 표준 JNI 명명 규칙(`Java_com_pkg_Class_method`) 대신 `JNI_OnLoad`에서 `RegisterNatives`을 사용합니다. 이는 각 Java 기본 메소드를 처리하는 C++ 함수를 숨깁니다.
+**패턴:** Android 앱은 `System.loadLibrary()`를 사용하여 네이티브 라이브러리를 로드하지만 표준 JNI 명명 규칙(`Java_com_pkg_Class_method`) 대신 `RegisterNatives`을 사용할 수 있습니다. 이는 표준 JNI 기능이며, 결과적으로 Java 메서드 이름과 내보낸 네이티브 기호의 직접 대응이 사라져 분석을 어렵게 할 수도 있습니다.
 
 **Identification:**
 ```java
@@ -55,7 +55,7 @@ private final native ProcessedMessage processMessage(SmsMessage msg);
 표준 JNI에는 `Java_com_rloura_wondersms_SmsReceiver_processMessage` 기호가 있습니다. `.so`에 해당 기호가 없으면 `RegisterNatives`가 사용됩니다.
 
 **Ghidra에서 실제 핸들러 찾기:**
-1. `JNI_OnLoad`(내보낸 기호, 항상 존재함)을 찾습니다.
+1. 내보내져 있다면 `JNI_OnLoad`를 찾고, 없으면 `RegisterNatives` 호출과 `JNINativeMethod` 배열 참조를 직접 추적합니다.
 2. `RegisterNatives(env, clazz, methods, count)` 호출 추적
 3. `methods` 배열에는 `{name, signature, fnPtr}` 구조체가 포함되어 있습니다.
 4. 실제 네이티브 함수를 찾으려면 `fnPtr`를 따르세요.
@@ -70,13 +70,14 @@ static JNINativeMethod methods[] = {
 
 **분석을 위한 아키텍처 선택:**
 ```bash
-# x86_64 gives best Ghidra decompilation (most similar to desktop code)
+# If the APK ships equivalent x86_64 and ARM64 builds, x86_64 may be easier
+# for an analyst already familiar with desktop x86; verify that logic matches.
 # Extract from APK:
 unzip WonderSMS.apk -d extracted/
-ls extracted/lib/x86_64/  # Prefer this over arm64-v8a for static analysis
+ls extracted/lib/x86_64/
 ```
 
-**주요 통찰력:** `RegisterNatives`은 의도적인 난독화 기술입니다. 즉, Java 메서드 이름을 기본 기호 이름에서 분리하여 문자열 검색만으로는 핸들러를 찾을 수 없게 만듭니다. 제거된 기호를 사용하여 Android 네이티브 라이브러리를 되돌릴 때는 항상 `JNI_OnLoad`를 먼저 확인하세요.
+**주요 통찰력:** `RegisterNatives`은 Java 메서드 이름을 네이티브 내보내기 이름에서 분리하므로 문자열 검색만으로는 핸들러를 찾기 어려울 수 있습니다. 제거된 Android 네이티브 라이브러리를 분석할 때 `JNI_OnLoad`와 직접 `RegisterNatives` 호출을 모두 확인하세요.
 
 **탐지:** Java로 선언된 기본 메소드 + `.so` + `JNI_OnLoad`에 일치하는 JNI 기호가 없습니다. 라이브러리는 일반적으로 제거됩니다(디버그 기호 없음).
 
@@ -105,13 +106,13 @@ for i in range(patch_offset, patch_offset + 144):
 # 5. Decompile with jadx or baksmali
 ```
 
-**주요 통찰력:** 네이티브 라이브러리는 `/proc/self/maps` + `mprotect`를 통해 메모리의 DEX 바이트코드를 수정할 수 있으므로 APK만으로는 정적 분석이 불충분합니다. 실제 런타임 DEX를 재구성하려면 네이티브 `.so`에서 XOR 키와 패치 오프셋을 추출해야 합니다. ART가 아닌 Dalvik(API < 21)에서만 작동합니다.
+**주요 통찰력:** 네이티브 라이브러리는 `/proc/self/maps` + `mprotect`를 통해 메모리의 DEX 바이트코드를 수정할 수 있으므로 APK만으로는 정적 분석이 불충분할 수 있습니다. 실제 런타임 DEX를 재구성하려면 네이티브 `.so`에서 XOR 키와 패치 오프셋을 추출해야 합니다. 이 사례의 오프셋과 패치 방식은 Dalvik 런타임에 종속되므로 다른 Android 버전·ART에 그대로 일반화하지 마세요.
 
 ---
 
 ### 새 프로젝트에서 Android 네이티브.so 로드 우회(Codegate CTF 2018)
 
-**패턴:** 복잡한 JNI 유효성 검사 논리를 뒤집는 대신 패키지 이름, 클래스 이름 및 네이티브 메서드 서명이 일치하는 새로운 Android Studio 프로젝트를 만듭니다. 원본 `.so` 라이브러리를 로드하고 모든 Java 수준 검사(난수 확인, PIN 입력, 루트 감지 등)를 완전히 우회하여 네이티브 함수를 직접 호출합니다.
+**패턴:** 복잡한 JNI 유효성 검사 논리를 뒤집는 대신 패키지 이름, 클래스 이름 및 네이티브 메서드 서명이 일치하는 새 Android Studio 프로젝트를 만듭니다. 원본 `.so`가 별도 서명·상태·Java 의존성을 확인하지 않는 이 사례에서는 Java 수준 검사를 거치지 않고 네이티브 함수를 직접 호출할 수 있었습니다.
 
 ```java
 // Create new project with same package: com.example.puing.a2018codegate
@@ -127,7 +128,7 @@ public class Main4Activity extends AppCompatActivity {
 }
 ```
 
-**주요 통찰력:** JNI 함수 이름은 패키지 경로와 클래스 이름을 인코딩합니다. 일치하는 package/class/method 이름으로 새 Android 프로젝트를 만들고, 원본 `.so`을 포함하고, 네이티브 함수를 직접 호출하세요. 모든 Java 수준 유효성 검사(무작위 검사, PIN 입력, 루트 감지)가 완전히 우회됩니다.
+**주요 통찰력:** 정적 JNI 함수 이름은 패키지 경로와 클래스 이름을 인코딩합니다. 일치하는 package/class/method 이름으로 새 프로젝트를 만들면 일부 라이브러리를 직접 호출할 수 있지만, `RegisterNatives`, 앱 서명, 런타임 상태, 의존 라이브러리 검사는 별도로 재현해야 합니다.
 
 **탐지:** APK 플래그 또는 비밀이 네이티브 코드 내에서 계산되어 Java로 반환되는 네이티브 `.so` 라이브러리를 사용합니다. Java 계층에는 네이티브 메서드를 호출하기 전에 여러 유효성 검사 게이트(EditText 검사, 난수 비교, 장치 검사)가 있습니다.
 
@@ -137,7 +138,7 @@ public class Main4Activity extends AppCompatActivity {
 
 ## Frida Firebase Cloud Functions 우회(BSidesSF 2026)
 
-**패턴(비닐 드롭, 도레미):** Android 앱은 Firebase Cloud Functions를 통해 작업(QR 코드, 구매)을 검증합니다. 예상되는 페이로드 형식에는 Firebase UID, 값, 타임스탬프가 포함됩니다. Frida를 사용하여 로그인 후 앱을 연결하고, 유효한 페이로드를 구성하고, Cloud 함수를 직접 호출하세요.
+**패턴(비닐 드롭, 도레미):** Android 앱은 Firebase Cloud Functions를 통해 작업(QR 코드, 구매)을 검증합니다. 이 CTF 사례에서는 예상 페이로드 형식에 Firebase UID, 값, 타임스탬프가 포함됐고, 허가된 챌린지 환경에서 로그인한 앱을 계측해 서버 검증의 결함을 확인했습니다.
 
 ```javascript
 // Frida hook to bypass QR validation
@@ -161,7 +162,7 @@ Java.perform(function() {
 });
 ```
 
-**주요 통찰력:** Firebase AppCheck 및 Cloud Functions는 클라이언트를 사용하여 유효한 페이로드를 구성합니다. 인증 후 Frida는 클라이언트 측 검증(QR 스캔, 결제 처리 등)을 우회하여 임의 매개변수로 Cloud 함수를 호출하도록 앱을 연결할 수 있습니다.
+**주요 통찰력:** 클라이언트 계측은 클라이언트 측 검증을 건너뛸 수 있지만, 올바르게 구현된 Cloud Function의 권한 검사·재생 방지·App Check·서버 측 입력 검증을 우회하지는 못합니다. 이 예제는 소유하거나 명시적으로 허가받은 CTF 대상에서만 사용하며, 성공 여부는 해당 서버의 검증 결함에 달려 있습니다.
 
 **인식해야 하는 경우:** `google-services.json`가 포함된 Android 앱, `build.gradle`의 Firebase 종속 항목, 디컴파일된 코드의 Cloud 함수 호출.
 
@@ -205,7 +206,7 @@ TIMING = {
 
 ## 접두사별 해시 반전(Nullcon 2026)
 
-전체 기술은 [patterns-ctf-2.md](patterns-ctf-2.md#prefix-hash-brute-force-nullcon-2026)을 참조하세요. 이 섹션에서는 언어별 고려 사항을 다룹니다.
+전체 기술은 [patterns-ctf-2.md](patterns-ctf-2.md#접두사-해시-무차별-대입nullcon-2026)을 참조하세요. 이 섹션에서는 언어별 고려 사항을 다룹니다.
 
 **Language-specific notes:**
 - 해시 알고리즘은 일반적이지 않을 수 있습니다(MD2, 사용자 정의). 이를 식별할 필요가 없으며 바이너리를 실행하여 출력을 일치시키기만 하면 됩니다.
@@ -235,12 +236,16 @@ TIMING = {
 ```python
 # Determine character ordering from inversion counts
 def reconstruct_from_inversions(chars, inv_counts):
-    result = []
+    if len(chars) != len(inv_counts) or len(set(chars)) != len(chars):
+        raise ValueError("this reconstruction expects unique characters and equal lengths")
+    result = [None] * len(chars)
     remaining = sorted(chars)
     for i in range(len(chars) - 1, -1, -1):
         # inv_counts[i] = number of elements to the left that are greater
-        idx = inv_counts[i]
-        result.insert(idx, remaining.pop(i))
+        idx = len(remaining) - 1 - inv_counts[i]
+        if not 0 <= idx < len(remaining):
+            raise ValueError(f"invalid inversion count at index {i}")
+        result[i] = remaining.pop(idx)
     return result
 ```
 
@@ -280,7 +285,9 @@ def decrypt_password(encrypted_bytes, key):
     """Common pattern: XOR with constant + bit rotation + key XOR."""
     result = []
     for i, byte in enumerate(encrypted_bytes):
-        decrypted = ((byte ^ 0x42) >> 3) ^ key[i % len(key)]
+        value = byte ^ 0x42
+        rotated = ((value >> 3) | (value << 5)) & 0xff
+        decrypted = rotated ^ key[i % len(key)]
         result.append(chr(decrypted))
     return ''.join(result)
 
@@ -289,7 +296,10 @@ def decrypt_flag(encrypted_flag, password):
     result = []
     for i, byte in enumerate(encrypted_flag):
         key_byte = ord(password[i % len(password)])
-        decrypted = ((byte ^ 0x7E) >> (i % 8)) ^ key_byte
+        shift = i % 8
+        value = byte ^ 0x7E
+        rotated = value if shift == 0 else ((value >> shift) | (value << (8 - shift))) & 0xff
+        decrypted = rotated ^ key_byte
         result.append(chr(decrypted))
     return ''.join(result)
 ```
@@ -303,6 +313,8 @@ def decrypt_flag(encrypted_flag, password):
 ## Node.js npm 패키지 런타임 검사(RootAccess2026)
 
 **패턴(RootAccess CLI):** RC4 인코딩, 제어 흐름 평면화 및 여러 조각에 걸친 플래그 분할을 갖춘 난독화된 npm 패키지입니다. 정적 분석은 비현실적입니다. 대신 런타임 내부 검사를 사용하세요.
+
+`require()`는 패키지의 최상위 코드를 즉시 실행합니다. 먼저 `package.json`과 설치 스크립트를 정적으로 검사하고, `npm install --ignore-scripts`를 사용한 뒤 비밀·자격 증명·공유 폴더·네트워크가 없는 폐기 가능한 VM에서만 로드하세요.
 
 **동적 분석 접근 방식:**
 ```javascript
@@ -411,7 +423,7 @@ JNI 네이티브 라이브러리는 `.data` 섹션에 저장된 XOR 난독화 �
 2. XOR 복호화 루틴 뒤에 중단점 설정
 3. 해독된 키가 포함된 메모리 영역을 덤프합니다.
 4. `baksmali`를 사용하여 APK의 DEX를 분해하고 서명된 POST 요청을 구성하는 smali 파일을 식별합니다.
-5. sali를 패치하여 서명된 매개변수를 변경한 다음 `apktool`로 다시 빌드하고 다시 설치하세요.
+5. smali를 패치하여 서명된 매개변수를 변경한 다음 `apktool`로 다시 빌드하고 다시 설치하세요.
 
 ```bash
 # Decompile APK
@@ -430,7 +442,7 @@ apktool b target_decompiled/ -o target_patched.apk
 
 ## IBM AS/400 SAVF 파일 EBCDIC 디코딩(EKOPARTY 2017)
 
-IBM AS/400 SAVF(파일 저장) 바이너리 파일은 ASCII가 아닌 EBCDIC 인코딩을 사용합니다. 플래그는 take-2-skip-2 패턴을 사용하여 더미 텍스트와 인터리브됩니다.
+IBM AS/400(현재 IBM i 계열) SAVF(save file)의 텍스트 레코드는 ASCII가 아닌 EBCDIC 계열 CCSID를 사용할 수 있습니다. 이 사례의 플래그는 take-2-skip-2 패턴을 사용하여 더미 텍스트와 인터리브됐습니다.
 
 ```python
 import codecs
@@ -439,16 +451,17 @@ with open('savefile.savf', 'rb') as f:
     data = f.read()
 
 # Convert EBCDIC to ASCII
-ascii_data = data.decode('cp500')  # cp500 is IBM EBCDIC International
+# cp500 was used by this artifact; determine the target CCSID before decoding
+ascii_data = data.decode('cp500')
 
 # Filter: keep uppercase letters and underscores (flag charset)
 flag_chars = [c for c in ascii_data if c.isupper() or c == '_']
 # Or apply take-2-skip-2 pattern after decoding
-flag = ''.join(ascii_data[i] for i in range(0, len(ascii_data), 4)
-               if ascii_data[i].isupper() or ascii_data[i] == '_')
+deinterleaved = ''.join(ascii_data[i:i + 2] for i in range(0, len(ascii_data), 4))
+flag = ''.join(c for c in deinterleaved if c.isupper() or c == '_')
 ```
 
-**주요 통찰력:** EBCDIC 인코딩은 IBM 메인프레임 기반입니다. 인터리빙 패턴을 식별하기 위해 디코딩 후 문자 분포를 검사합니다. 대문자와 밑줄 필터링은 CTF 플래그 형식에 대한 효과적인 지름길입니다.
+**주요 통찰력:** AS/400은 IBM의 미드레인지 시스템 계열이며 EBCDIC 계열 CCSID를 사용합니다. SAVF 전체를 하나의 텍스트 스트림으로 가정하지 말고 레코드 구조와 CCSID를 먼저 식별하세요. 대문자와 밑줄 필터링은 이 CTF 플래그 형식에만 맞춘 지름길입니다.
 
 **참고자료:** EKOPARTY CTF 2017
 
@@ -473,14 +486,20 @@ from cryptography.hazmat.primitives import cmac, ciphers
 private_key = ec.generate_private_key(ec.SECP256R1())
 shared_secret = private_key.exchange(ec.ECDH(), server_pub_key)
 
-# CMAC-AES-128 key derivation (per SGX attestation spec)
-c = cmac.CMAC(ciphers.algorithms.AES(b'\x00' * 16))
-c.update(shared_secret[:16])
-sk = c.finalize()
+# Classic Intel SGX sample remote-attestation KDF. cryptography returns the
+# P-256 ECDH x-coordinate in big-endian form; the sample protocol CMACs it
+# in little-endian form to derive KDK, then applies the SK label.
+def aes_cmac(key, data):
+    c = cmac.CMAC(ciphers.algorithms.AES(key))
+    c.update(data)
+    return c.finalize()
+
+kdk = aes_cmac(b'\x00' * 16, shared_secret[::-1])
+sk = aes_cmac(kdk, b'\x01SK\x00\x80\x00')
 
 # Decrypt flag with AES-128-GCM using derived SK
 ```
 
-**주요 통찰력:** SGX 원격 증명 키 파생은 엔클레이브 측정을 고려하여 결정적입니다. Python에서 프로토콜을 다시 구현하면 동일한 세션 키가 복구됩니다.
+**주요 통찰력:** 원격 증명은 엔클레이브 신원과 TCB 상태를 검증하고, 세션 키는 프로토콜의 일회성 ECDH 키로부터 파생됩니다. 따라서 측정값만으로 키가 결정되지는 않습니다. 실제 구현의 바이트 순서와 KDF 버전을 확인한 뒤 동일한 세션 입력을 재현해야 합니다.
 
 **참조:** Pwn2Win CTF 2017

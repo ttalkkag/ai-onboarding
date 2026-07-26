@@ -5,7 +5,7 @@
 
 ---
 
-## 바이너리 기능 인식으로 이동
+## Go 바이너리 식별
 
 Go를 사용하여 바이너리가 컴파일되었는지 빠르게 확인합니다.
 
@@ -24,7 +24,7 @@ rabin2 -z binary | grep -i "runtime"
 - `runtime.` 접두사가 포함된 다수의 함수
 - `go.buildid` 섹션 포함
 - `GOROOT`, `GOPATH` 경로 문자열을 포함합니다.
-- 기능 수 5000-50000+(전체 런타임 및 표준 라이브러리 포함)
+- 전체 런타임과 표준 라이브러리 때문에 함수 수와 파일 크기가 C 바이너리보다 크게 보일 수 있음
 
 ---
 
@@ -35,9 +35,9 @@ rabin2 -z binary | grep -i "runtime"
 | 도구| 목적| 링크|
 |------|------|------|
 | **GoReSym** | Mandiant 제작, Go 기호 정보 파싱(pclntab/moduledata)| https://github.com/mandiant/GoReSym |
-| **GoResolver** | Volexity를 통해 CFG 유사성으로 Garble 바이너리를 자동으로 해독합니다.| https://github.com/volexity/GoResolver |
+| **GoResolver** | Volexity 제작; CFG 유사성으로 Garble 바이너리의 함수 의미를 복구합니다.| https://github.com/volexity/GoResolver |
 | **redress** | 스트립된 Go 바이너리 분석, 유형/인터페이스/패키지 구조 복원| https://github.com/goretk/redress |
-| **GoStringUngarbler** | Garble 난독화된 문자열을 복구하기 위해 특별히 설계된 Google에서 제작| https://github.com/mandiant/GoStringUngarbler |
+| **GoStringUngarbler** | Mandiant가 Garble 난독화 문자열 복구용으로 제작| https://github.com/mandiant/GoStringUngarbler |
 
 ### IDA 플러그인
 
@@ -53,7 +53,7 @@ rabin2 -z binary | grep -i "runtime"
 | 도구| 목적| 링크|
 |------|------|------|
 | **Ghidra + GoReSym 출력**| GoReSym을 사용하여 기호 내보내기 및 가져오기 Ghidra|함께 사용|
-| **golang_loader_assist** | Ghidra 로딩 지원 이동| 커뮤니티 스크립트|
+| **golang_loader_assist** | Ghidra의 Go 바이너리 로딩 지원| 커뮤니티 스크립트|
 
 ### 독립형 분석 도구
 
@@ -78,7 +78,7 @@ Go 바이너리의 가장 중요한 구조는 다음과 같습니다.
 
 ```text
 포지셔닝 방법:
-1. 매직 바이트 검색: 0xFFFFFFFF0(Go 1.16+) 또는 0xFFFFFFFFB(Go 1.18+)
+1. 매직 검색: Go 1.2=`0xfffffffb`, 1.16=`0xfffffffa`, 1.18=`0xfffffff0`, 1.20 레이아웃=`0xfffffff1` (대상 엔디언으로 저장)
 2. GoReSym을 이용한 자동 위치 지정
 3. go_parser IDA 플러그인을 사용하여 자동으로 구문 분석
 ```
@@ -105,7 +105,7 @@ Go 문자열: struct { ptr *byte; len int } → ptr은 "hello"(\0 없음)를 가
 **해결책**:
 - `go_parser`로 Go 문자열을 자동으로 식별합니다.
 - GoReSym을 사용하여 문자열 목록 내보내기
-- 수동: `runtime.stringtable` 찾기 또는 상호 참조를 통해 찾기
+- 수동: 문자열 `(pointer, length)`가 소비되는 코드와 `.rodata` 상호 참조를 추적하기
 
 ---
 
@@ -128,9 +128,9 @@ Go 문자열: struct { ptr *byte; len int } → ptr은 "hello"(\0 없음)를 가
 1. GoReSym -t -d -p binary > symbols.json
 → 제거하더라도 pclntab은 대개 그대로 유지됩니다.
 2. GoReSym이 실패하는 경우 → 수정 사용
-   redress -src 바이너리 #소스 파일 경로 복원
-   redress -pkg 바이너리 #패키지 구조 복원
-   redress -type bin #복원 유형 정보
+   redress source 바이너리          # 소스 트리 복원
+   redress packages 바이너리        # 패키지 구조 복원
+   redress types all 바이너리       # 유형 정보 복원
 3. IDA + go_parser 플러그인에 로드
 4. go_parser를 실행하여 자동 복원
 5. 복원된 main.main에서 시작합니다.
@@ -172,14 +172,14 @@ Garble은 다음을 수행합니다.
 ```bash
 # GoReSym: export symbols
 GoReSym -t -d -p binary > symbols.json
-GoReSym -t -d -p binary -o ida_script.py  # Generate IDA script
+# IDA에서는 GoReSym 저장소의 IDAPython/goresym_rename.py로 symbols.json을 가져옵니다.
 
 # 수정: 제거된 바이너리 구문 분석
-redress -src binary          # 소스 파일 경로
-redress -pkg binary          # Package structure
-redress -type binary         # type information
-redress -interface binary    # Interface information
-redress -filepath binary     # full file path
+redress source binary        # 소스 파일 경로
+redress packages binary      # Package structure
+redress types all binary     # type information
+redress types interface binary       # Interface information
+redress packages binary --filepath   # Package file paths
 
 # GoResolver: Garble 난독화 해제
 GoResolver -binary binary -output resolved.json
@@ -219,11 +219,11 @@ GoReSym -p binary | grep "Version"
 
 | 함정| 설명| 해결하다|
 |------|------|------|
-| 기능이 너무 많아 명확하게 볼 수 없음|Go 정적 링크 결과는 5000-50000개 함수입니다.| 패키지 이름으로 필터링하고 main.* 및 비즈니스 패키지만 확인하세요.|
+| 기능이 너무 많아 명확하게 볼 수 없음|Go 정적 링크에는 런타임·표준 라이브러리 함수가 함께 포함됩니다.| 패키지 이름으로 필터링하고 main.* 및 비즈니스 패키지만 확인하세요.|
 | 불완전한 문자열 인식| Go 문자열은 null로 끝나지 않습니다.| go_parser 또는 GoReSym을 사용하여 복원|
 | 디컴파일 결과를 읽기가 어렵습니다.| Go의 defer/goroutine/interface는 의사코드를 복잡하게 만듭니다| IDA 9.2+에는 개선 사항이 있거나 동적 분석의 도움을 받을 수 있습니다.|
 | 혼란스러운 혼란| 함수 이름/문자열은 모두 무작위입니다.| GoResolver + GoStringUngarbler|
-| 버전 차이| Go 버전마다 pclntab 형식이 다릅니다.| GoReSym은 Go 1.2-1.23+를 지원합니다.|
+| 버전 차이| Go 버전마다 pclntab 형식이 다릅니다.| GoReSym은 Go 1.2 이후의 여러 레이아웃을 추적하지만, 대상 Go 버전은 사용 중인 GoReSym 릴리스 노트에서 확인하세요.|
 | CGo 경계| Go와 C 코드 혼합| _cgo_* 함수를 구분선으로 식별|
 
 ---

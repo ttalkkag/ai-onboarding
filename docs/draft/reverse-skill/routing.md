@@ -1,9 +1,10 @@
 # 라우팅 매트릭스 (macOS 큐레이션판)
 
-대상 유형 × 의도에 맞는 모듈로 라우팅한다. 각 모듈의 진입 문서는 `modules/<module>/methodology.md`.
+> **참고 자료 분류표:** 현재 제품의 자동 라우팅이나 실행 플로우가 아니다. 모듈은 정적 탐지 아이디어를 찾을 때만 열어 보고, 명령·도구 계약은 채택 전에 별도로 검증한다.
 
-> 원본(zhaoxuya520/reverse-skill)의 "라우팅 전 반드시 즉시 실행" 강제 프로토콜은 **적용하지 않는다.**
-> 이 프로젝트 정책: 정적 분석 우선, 도구 설치·동적 실행은 승인 게이트+샌드박스 (상위 `SKILL.md` 참고).
+대상 유형 × 조사 주제에 맞는 참고 문서를 찾기 위한 분류표다. 각 모듈의 시작 문서는 `modules/<module>/methodology.md`다.
+
+> 원본의 "라우팅 전 반드시 즉시 실행" 프로토콜은 적용하지 않는다. Secure Onboard는 이 표를 자동 호출에 사용하지 않으며 대상 설치·동적 실행을 수행하지 않는다.
 
 ## 대상 유형별
 
@@ -25,9 +26,8 @@
 
 ## 모듈 조합
 
-- 다운로드 코드 검사: `secure-onboard` 1차 스캔 → 난독화 JS는 `js-reverse`, 인코딩/바이너리는
-  `malware-analysis`, 의존성은 `supply-chain-security`로 심층 분석.
-- 바이너리: `reverse-engineering`(개요) → `radare2`/`ida-reverse`(정밀) → `binary-diff`(버전 비교).
+- 다운로드 코드 검사 규칙 조사: 난독화 JS는 `js-reverse`, 인코딩·바이너리는 `malware-analysis`, 의존성은 `supply-chain-security` 문서에서 정적 탐지 아이디어만 검토한다.
+- 바이너리 규칙 조사: `reverse-engineering`에서 정적 IOC를 찾고 실제 도구·API·플랫폼 계약은 별도로 검증한다.
 
 ## 제외된 원본 모듈 (macOS 부적합/범위 외)
 

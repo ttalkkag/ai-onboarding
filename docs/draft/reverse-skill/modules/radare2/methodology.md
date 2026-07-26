@@ -17,7 +17,7 @@ description: |
 - 명령줄 분해, 함수 보기, 문자열 보기, 가져오기 및 내보내기 보기, 상호 참조 확인 및 패치 수행이 필요합니다.
 - `radare2` 배치 명령어, `-c` 자동화 명령어, `r2pipe` 스크립트 작성 필요
 
-사용자가 명시적으로 GUI 반전, Hex-Rays 스타일 의사코드 또는 IDA 작업흐름을 원하는 경우 `ida-reverse`에 우선순위를 부여하세요. 웹페이지 JS 리버스엔지니어링인 경우 `reverse-engineering`이 우선됩니다.
+사용자가 명시적으로 GUI 반전, Hex-Rays 스타일 의사코드 또는 IDA 작업흐름을 원하는 경우 `ida-reverse`에 우선순위를 부여하세요. 웹페이지 JS 리버스엔지니어링인 경우 `js-reverse`가 우선됩니다.
 
 ## 먼저 환경을 확인하세요
 
@@ -40,9 +40,9 @@ rabin2 -v
 - `rax2.exe`
 - `r2pm.exe`
 
-## Built-in resources
+## 포함 리소스와 제외된 자동화
 
-이 스킬에는 두 가지 리소스가 함께 제공되므로 매번 반복되는 명령 집합을 일시적으로 구성하는 대신 먼저 재사용해야 합니다.
+현재 큐레이션에는 `references/cheatsheet.md`만 포함되어 있습니다. 아래 `scripts/recon.ps1` 설명은 상류 전체 패키지의 인터페이스 참고이며 이 저장소에서는 실행할 수 없습니다.
 
 ### `scripts/recon.ps1`
 
@@ -112,7 +112,7 @@ ERROR: Cannot find ...\share\format\dll\*.sdb
 
 바이너리 파일을 얻는 경우에 적합합니다.
 
-내장 스크립트를 직접 실행하는 데 우선순위를 지정하세요.
+현재 큐레이션에는 정찰 스크립트가 없으므로 아래 수동 명령을 기본으로 사용하세요. 다음 호출은 스크립트를 별도 도입하고 검증한 경우에만 사용할 수 있습니다.
 
 ```powershell
 powershell -File "<skill-root>\radare2\scripts\recon.ps1" -TargetPath "sample.exe"
@@ -147,8 +147,8 @@ aaa # 일반 자동 분석
 afl # 목록 함수
 iz # 목록 문자열
 iS # 열 섹션 영역
-# 열 기호입니다.
-s Entry0 # 진입점으로 점프
+is # 기호 목록
+s entry0 # 진입점 플래그로 점프
 pdf # 현재 함수를 분해합니다
 VV # 비주얼 모드로 들어갑니다 (터미널이 적합한 경우)
 q #나가기
@@ -198,14 +198,14 @@ r2 -w sample.exe
 s 0x401000
 wa nop
 wa jmp 0x401050
-wq
+q
 ```
 
 일반적인 쓰기 작업:
 
 - `wa <asm>`: 어셈블리 쓰기
 - `wx <hex>`: 원시 바이트 쓰기
-- `wq`: 작성 후 종료
+- `q`: 종료(`-w` 모드의 쓰기 명령은 즉시 파일에 반영됨)
 
 수정하기 전에 원본 파일을 백업하는 것이 가장 좋습니다. 사용자가 백업에 대해 언급하지 않는 경우 적어도 한 번은 상기시켜주세요.
 
@@ -225,7 +225,7 @@ r2 -A -q -c "afl;iz;ii;q" sample.exe
 
 명령이 많은 경우 읽기 쉬운 순서로 우선순위를 지정하고 유지 관리하기 어려운 매우 긴 문자열에 넣지 마십시오.
 
-기본으로 제공되는 정찰 스크립트를 먼저 기본으로 사용한 후 사용자 정의 명령을 추가할지 여부를 결정하는 것이 더 좋습니다.
+정찰 스크립트를 별도 도입한 경우에는 검증된 짧은 스크립트부터 사용하고, 현재 큐레이션에서는 위 수동 명령을 유지하세요.
 
 ## 일반적으로 사용되는 하위 도구
 
@@ -353,16 +353,16 @@ rax2 -s hello
 ## 참고자료
 
 - 명령 빠른 확인: `references/cheatsheet.md`
-- 표준 정찰 스크립트: `scripts/recon.ps1`
+- 표준 정찰 스크립트 계약(현재 미포함): `scripts/recon.ps1`
 
 ---
 
 ## 라우팅 컨텍스트
 
-**상류 입구**: `../../SKILL.md`(마스터 제어), `routing.md`
+**상류 입구**: `../../SKILL.md`(마스터 제어), `../../routing.md`
 **업스트림 대안**: `ida-reverse/` (디컴파일/의사 코드가 필요한 경우 IDA로 업그레이드)
 **다운스트림 내보내기**:
-- 동적해석 필요 → `reverse-engineering/tools-dynamic.md` (Frida/GDB)
+- 동적해석 필요 → `../reverse-engineering/tools-dynamic.md` (Frida/GDB)
 - 심층적인 디컴파일 필요 → `ida-reverse/`
 - PAT는 흥미로운 문자열을 찾은 후 상호 참조가 필요함 → `ida-reverse/` (IDA의 외부 참조가 더 강력함)
 
@@ -372,25 +372,17 @@ rax2 -s hello
 
 ## 주문형 부트스트랩
 
-해당 스킬의 진입 스크립트가 통합 부트스트래핑 시스템에 연결되었습니다. radare2이 누락되면 오류가 직접 보고되지 않지만 자동으로 설치가 시도됩니다.
+현재 큐레이션에는 진입·설치 스크립트가 없으므로 radare2를 자동 설치하지 않습니다.
 
 ### 자동화 기능 경계
 
 | 도구| 자동으로 설치 가능| 설치방법| 설명|
 |------|-----------|---------|------|
-| r2 | ✓ | GitHub 릴리스 ZIP(w64)| `%USERPROFILE%\Tools\radare2\`로 자동 다운로드 및 압축 해제|
-| rabin2 | ✓ | 위와 동일(radare2 배포판에 포함됨)| — |
-| rasm2 | ✓ | 위와 동일| — |
-| radiff2 | ✓ | 위와 동일| — |
-| rahash2 | ✓ | 위와 동일| — |
-| rax2 | ✓ | 위와 동일| — |
-
-### 부트스트랩 트리거 포인트
-
-- `scripts/recon.ps1`: `rabin2` 또는 `r2`가 누락된 경우 자동으로 `bootstrap-reverse.ps1`를 호출합니다.
+| r2 | ✗ | 공식 릴리스 또는 운영체제 패키지 관리자 | 설치 후 `r2 -v` 확인 |
+| rabin2 / rasm2 / radiff2 / rahash2 / rax2 | ✗ | radare2 배포판에 포함 | 각 명령의 존재 여부 확인 |
 
 ### 부트스트래핑이 실패하는 경우
 
-자동 설치에 실패하는 경우(네트워크 오류, GitHub API 제한 등) 스크립트는 수동 설치 링크와 함께 명확한 오류를 발생시킵니다.
+도구가 없으면 분석을 실행했다고 주장하지 말고 공식 설치 문서를 안내합니다.
 
-수동 설치: https://github.com/radareorg/radare2/releases에서 `radare2-*-w64.zip`을 다운로드하고 `%USERPROFILE%\Tools\radare2\`로 압축을 푼 다음 `bin\` 디렉터리가 PATH에 있는지 확인하세요.
+수동 설치: [radare2 공식 릴리스](https://github.com/radareorg/radare2/releases)에서 운영체제에 맞는 패키지를 받고 설치 후 `bin/` 디렉터리가 PATH에 있는지 확인하세요.

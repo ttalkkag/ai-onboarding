@@ -1,14 +1,14 @@
 # CTF 리버스 - 경쟁별 패턴(2부)
 
 ## 목차
-- [다층 자기 복호화 바이너리(DiceCTF 2026)](#multi-layer-self-decrypting-binary-dicectf-2026)
-- [임베디드 ZIP + XOR 라이센스 복호화(MetaCTF 2026)](#embedded-zip--xor-license-decryption-metactf-2026)
-- [.rodata XOR Blob의 스택 문자열 해독(Nullcon 2026)](#stack-string-deobfuscation-from-rodata-xor-blob-nullcon-2026)
-- [접두사 해시 무차별 대입(Nullcon 2026)](#prefix-hash-brute-force-nullcon-2026)
-- [CVP/LLL 제한된 정수 검증을 위한 격자(HTB ShadowLabyrinth)](#cvplll-lattice-for-constrained-integer-validation-htb-shadowlabyrinth)
-- [의사결정 트리 함수 난독화(HTB WonderSMS)](#decision-tree-function-obfuscation-htb-wondersms)
-- [플래그 복구를 위한 GF(2^8) 가우스 제거(ApoorvCTF 2026)](#gf28-gaussian-elimination-for-flag-recovery-apoorvctf-2026)
-- [수정된 바이너리의 ROP 체인 난독화(PlaidCTF 2016)](#rop-chain-obfuscation-in-modified-binary-plaidctf-2016)
+- [다층 자체 복호화 바이너리(DiceCTF 2026)](#다층-자체-복호화-바이너리dicectf-2026)
+- [임베디드 ZIP + XOR 라이센스 복호화(MetaCTF 2026)](#임베디드-zip--xor-라이센스-복호화metactf-2026)
+- [.rodata XOR Blob의 스택 문자열 난독화(Nullcon 2026)](#rodata-xor-blob의-스택-문자열-난독화nullcon-2026)
+- [접두사 해시 무차별 대입(Nullcon 2026)](#접두사-해시-무차별-대입nullcon-2026)
+- [CVP/LLL 제한된 정수 검증을 위한 격자(HTB ShadowLabyrinth)](#cvplll-제한된-정수-검증을-위한-격자htb-shadowlabyrinth)
+- [의사결정 트리 함수 난독화(HTB WonderSMS)](#의사결정-트리-함수-난독화htb-wondersms)
+- [플래그 복구를 위한 GF(2^8) 가우스 제거(ApoorvCTF 2026)](#플래그-복구를-위한-gf28-가우스-제거apoorvctf-2026)
+- [수정된 바이너리의 ROP 체인 난독화(PlaidCTF 2016)](#수정된-바이너리의-rop-체인-난독화plaidctf-2016)
 
 ---
 
@@ -22,8 +22,10 @@
 ```c
 // Map binary's memory at original virtual addresses into solver process
 // Compile solver at non-overlapping address: -Wl,-Ttext-segment=0x10000000
-void *text = mmap((void*)0x400000, text_size, PROT_RWX, MAP_FIXED|MAP_PRIVATE, fd, 0);
-void *bss = mmap((void*)bss_addr, bss_size, PROT_RW, MAP_FIXED|MAP_SHARED, shm_fd, 0);
+void *text = mmap((void*)0x400000, text_size,
+                  PROT_READ|PROT_WRITE|PROT_EXEC, MAP_FIXED|MAP_PRIVATE, fd, 0);
+void *bss = mmap((void*)bss_addr, bss_size,
+                 PROT_READ|PROT_WRITE, MAP_FIXED|MAP_SHARED, shm_fd, 0);
 
 // Patch read@plt to inject candidate bytes instead of reading stdin
 // Patch tail jmp/call to next layer with ret/NOP to return from layer
@@ -33,7 +35,8 @@ for (int candidate = 0; candidate < 65536; candidate++) {
     pid_t pid = fork();
     if (pid == 0) {
         // Child: remap BSS as MAP_PRIVATE (COW from shared file)
-        mmap(bss_addr, bss_size, PROT_RW, MAP_FIXED|MAP_PRIVATE, shm_fd, 0);
+        mmap(bss_addr, bss_size, PROT_READ|PROT_WRITE,
+             MAP_FIXED|MAP_PRIVATE, shm_fd, 0);
         inject_key(candidate >> 8, candidate & 0xff);
         ((void(*)())layer_addr)();  // Execute layer as function call
         // Check: does decrypted code contain exactly 2 call read@plt?
@@ -49,7 +52,7 @@ for (int candidate = 0; candidate < 65536; candidate++) {
 | Python subprocess | ~2/s | days |
 | Ptrace 포크 주입 | ~119/s | 6+ hours |
 | JIT + fork-per-candidate | ~1000/s | 140 min |
-| JIT + 공유 BSS + 작업자 32명 | ~3500/s | **~17분** |
+| JIT + 공유 BSS + 작업자 32명 | ~3500/s | 총 후보 수 / 3500초(예: 2^24이면 최악 약 80분) |
 
 **공유 BSS 최적화:** BSS(16MB+)가 상위 항목의 `MAP_SHARED`로 `/dev/shm`에 저장됩니다. COW의 경우 어린이는 `MAP_PRIVATE`로 다시 매핑됩니다. 16MB 페이지 테이블 설정에서 ~4KB로 포크 오버헤드를 줄입니다.
 
@@ -58,7 +61,7 @@ for (int candidate = 0; candidate < 65536; candidate++) {
 **Gotchas:**
 - 실제 바이너리는 레이어 전환에 `jmp`(0xe9) 대신 `call`(0xe8)을 사용할 수 있습니다. — 테일 패치 조정
 - BSS는 커널 brk 매핑을 통해 ELF MemSiz 이상으로 확장될 수 있습니다. — 추가 공간 매핑
-- SHA-NI 명령은 `/proc/cpuinfo`에 광고되지 않은 경우에도 작동합니다.
+- SHA-NI 사용 가능 여부는 CPUID/OS 노출을 확인해야 하며, 지원하지 않는 CPU에서 실행하면 invalid-opcode 예외가 발생합니다.
 
 ---
 
@@ -175,7 +178,7 @@ for pos in range(1, len(target_hashes)):
 
 ## CVP/LLL 제한된 정수 검증을 위한 격자(HTB ShadowLabyrinth)
 
-**패턴:** 바이너리는 그룹화된 입력 문자에 계수 행렬을 곱하고 예상되는 64비트 결과와 비교하여 확인하는 행렬 곱셈을 통해 플래그를 검증합니다. 솔루션은 인쇄 가능한 ASCII(32-126)여야 하므로 표준 대수학은 실패합니다. LLL 감소 기능을 갖춘 격자 기반 CVP(Closest Vector Problem)는 이를 효율적으로 해결합니다.
+**패턴:** 바이너리는 그룹화된 입력 문자에 계수 행렬을 곱하고 예상되는 64비트 결과와 비교하여 플래그를 검증합니다. 해가 인쇄 가능한 ASCII(32-126)로 제한되면 먼저 정확한 bounded-integer 제약으로 풉니다. 근사값·오차 또는 큰 underdetermined 시스템 때문에 격자가 필요한 경우에는 문제별 CVP embedding을 별도로 유도하고 원래 식으로 검증해야 합니다.
 
 **Identification:**
 1. 바이너리 그룹 입력 문자(예: 한 번에 4개)
@@ -183,41 +186,31 @@ for pos in range(1, len(target_hashes)):
 3. 하드코딩된 64비트 값과 비교한 결과
 4. 제한된 범위의 정수 솔루션이 필요함(인쇄 가능한 ASCII)
 
-**SageMath CVP 솔버:**
+**정확한 bounded-integer 솔버:**
 ```python
-from sage.all import *
+from z3 import Int, Solver, Sum, sat
 
 def solve_constrained_matrix(coefficients, targets, char_range=(32, 126)):
-    """
-    coefficients: list of coefficient rows (e.g., 4 values per group)
-    targets: expected output values
-    char_range: valid character range (printable ASCII)
-    """
-    n = len(coefficients[0])  # characters per group
-    mid = (char_range[0] + char_range[1]) // 2
+    if not coefficients or len(coefficients) != len(targets):
+        raise ValueError("one target is required per coefficient row")
+    n = len(coefficients[0])
+    if any(len(row) != n for row in coefficients):
+        raise ValueError("ragged coefficient matrix")
 
-    # Build lattice: [coeff_matrix | I*scale]
-    # The target vector includes adjusted targets
-    M = matrix(ZZ, n + len(targets), n + len(targets))
-    scale = 1000  # Weight to constrain character range
+    x = [Int(f"x_{i}") for i in range(n)]
+    solver = Solver()
+    lo, hi = char_range
+    solver.add(*(x_i >= lo for x_i in x), *(x_i <= hi for x_i in x))
+    for row, target in zip(coefficients, targets):
+        solver.add(Sum(*(c * x_i for c, x_i in zip(row, x))) == target)
 
-    for i, row in enumerate(coefficients):
-        for j, c in enumerate(row):
-            M[j, i] = c
-        M[n + i, i] = 1  # padding
-
-    for j in range(n):
-        M[j, len(targets) + j] = scale
-
-    target_vec = vector(ZZ, [t - sum(c * mid for c in row)
-                              for row, t in zip(coefficients, targets)]
-                        + [0] * n)
-
-    # LLL + CVP
-    L = M.LLL()
-    closest = L * L.solve_left(target_vec)  # or use Babai
-    solution = [closest[len(targets) + j] // scale + mid for j in range(n)]
-    return bytes(solution)
+    if solver.check() != sat:
+        raise ValueError("no bounded exact solution")
+    model = solver.model()
+    solution = bytes(model.eval(x_i).as_long() for x_i in x)
+    assert all(sum(c * b for c, b in zip(row, solution)) == target
+               for row, target in zip(coefficients, targets))
+    return solution
 ```
 
 **2단계 검증 패턴:**
@@ -227,17 +220,28 @@ def solve_constrained_matrix(coefficients, targets, char_range=(32, 126)):
 
 **모듈형 선형 시스템 해석(2단계 — VM 검증):**
 ```python
-import numpy as np
-from sympy import Matrix
+from z3 import BitVec, BitVecVal, Solver, UGE, ULE, sat
 
 # M * x = v (mod 2^32)
-M_mod = Matrix(coefficients) % (2**32)
-v_mod = Matrix(targets) % (2**32)
-# Gaussian elimination in Z/(2^32)
-solution = M_mod.solve(v_mod)  # Returns flag characters
+x = [BitVec(f"x_{i}", 32) for i in range(len(coefficients[0]))]
+solver = Solver()
+solver.add(*(UGE(x_i, 32) for x_i in x), *(ULE(x_i, 126) for x_i in x))
+for row, target in zip(coefficients, targets):
+    expr = sum(BitVecVal(c, 32) * x_i for c, x_i in zip(row, x))
+    solver.add(expr == BitVecVal(target, 32))
+
+if solver.check() != sat:
+    raise ValueError("no bounded modular solution")
+model = solver.model()
+solution = bytes(model.eval(x_i).as_long() for x_i in x)
+mask = (1 << 32) - 1
+assert all((sum(c * b for c, b in zip(row, solution)) & mask) == (target & mask)
+           for row, target in zip(coefficients, targets))
 ```
 
-**주요 통찰력:** 바이너리가 큰 계수를 갖는 선형 조합을 통해 입력을 검증하고 솔루션이 작은 범위(인쇄 가능한 ASCII)에 있어야 하는 경우 이는 위장된 격자 문제입니다. LLL 감소 + CVP는 가장 가까운 격자점을 찾아 제한된 솔루션을 복구합니다. 상호 참조: LLL/CVP 기본 사항에 대해 `/ctf-crypto`를 호출합니다(ctf-crypto에서는 advanced-math.md).
+`2^32`는 합성수이므로 `Z/(2^32)`는 체가 아닙니다. 따라서 유리수용 `Matrix.solve()`나 체를 전제로 한 가우스 소거를 그대로 사용할 수 없고, 짝수 pivot에서는 해가 없거나 여러 개일 수 있습니다. 후보를 열거하거나 blocking constraint를 추가해 유일성을 확인한 뒤 원래 VM으로 검증하세요.
+
+**주요 통찰력:** 작은 범위의 정확한 선형 제약은 먼저 SMT/정수 제약으로 풉니다. CVP/LLL은 자동으로 성립하는 변환이 아니며, 격자 basis·스케일·목표 벡터를 해당 검증식에서 유도한 뒤 복구한 해를 원래 식으로 다시 확인해야 합니다.
 
 **탐지:** 바이너리는 그룹화된 입력에 대해 행렬과 같은 연산을 수행하고 64비트 상수와 비교하며 무차별 검색 공간이 너무 큽니다(예: 그룹당 256^4 × 12개 그룹).
 
@@ -323,6 +327,8 @@ N = 56  # Flag length
 for col in range(N):
     # Find non-zero pivot
     pivot = next((r for r in range(col, N) if aug[r][col] != 0), -1)
+    if pivot == -1:
+        raise ValueError("singular or underdetermined system")
     if pivot != col:
         aug[col], aug[pivot] = aug[pivot], aug[col]
     # Scale pivot row by inverse

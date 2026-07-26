@@ -1,43 +1,43 @@
 # CTF Reverse - 동적 분석 도구
 
 ## 목차
-- [Frida (동적 계측)](#frida-dynamic-instrumentation)
-  - [설치](#installation)
-  - [기본 기능 Hooking](#basic-function-hooking)
-  - [디버그 우회](#anti-debug-bypass)
-  - [메모리 스캐닝 및 패치](#memory-scanning-and-patching)
-  - [기능 교체](#function-replacement)
-  - [추적 앤 스토커](#추적 앤 스토커)
-  - [r2frida(Radare2 + Frida 통합)](#r2frida-radare2--frida-integration)
-  - [Frida for Android/iOS](#frida-for-androidios)
-  - [Frida 재귀 함수 속도 향상을 위한 메모(hxp CTF 2017)](#frida-memoization-for-recursive-function-speedup-hxp-ctf-2017)
-- [angr(기호 실행)](#angr-symbolic-execution)
-  - [angr 설치](#angr-installation)
-  - [기본 경로 탐색](#basic-path-exploration)
-  - [제약조건이 있는 기호 입력](#symbolic-input-with-constraints)
-  - [분석을 단순화하는 후크 기능](#hook-functions-to-simplify-analytic)
-  - [특정 주소에서 탐색](#exploring-from-특정 주소)
-  - [공통 패턴 및 팁](#common-patterns-and-tips)
-  - [경로 폭발 처리](#dealing-with-path-explosion)
-  - [angr CFG 회복](#angr-cfg-recovery)
-- [lldb(LLVM 디버거)](#lldb-llvm-debugger)
-  - [기본 명령어](#basic-commands)
-  - [스크립팅(Python)](#scripting-python)
-- [x64dbg(Windows 디버거)](#x64dbg-windows-debugger)
-  - [주요 기능](#key-features)
+- [Frida(동적 계측)](#frida동적-계측)
+  - [Installation](#installation)
+  - [기본 기능 후킹](#기본-기능-후킹)
+  - [Anti-Debug Bypass](#anti-debug-bypass)
+  - [메모리 스캐닝 및 패치](#메모리-스캐닝-및-패치)
+  - [Function Replacement](#function-replacement)
+  - [추적 및 스토커](#추적-및-스토커)
+  - [r2frida(Radare2 + Frida 통합)](#r2fridaradare2--frida-통합)
+  - [Android/iOS의 경우 Frida](#androidios의-경우-frida)
+  - [Frida 재귀 함수 속도 향상을 위한 메모(hxp CTF 2017)](#frida-재귀-함수-속도-향상을-위한-메모hxp-ctf-2017)
+- [angr(기호 실행)](#angr기호-실행)
+  - [angr Installation](#angr-installation)
+  - [기본 경로 탐색](#기본-경로-탐색)
+  - [제약 조건이 있는 기호 입력](#제약-조건이-있는-기호-입력)
+  - [분석을 단순화하는 후크 기능](#분석을-단순화하는-후크-기능)
+  - [특정 주소에서 탐색](#특정-주소에서-탐색)
+  - [일반적인 패턴과 팁](#일반적인-패턴과-팁)
+  - [경로 폭발 처리](#경로-폭발-처리)
+  - [angr CFG 복구](#angr-cfg-복구)
+- [lldb(LLVM 디버거)](#lldbllvm-디버거)
+  - [Basic Commands](#basic-commands)
+  - [Scripting (Python)](#scripting-python)
+- [x64dbg(Windows 디버거)](#x64dbgwindows-디버거)
+  - [Key Features](#key-features)
   - [Scripting](#scripting)
-  - [공통 CTF 작업 흐름](#common-ctf-workflow)
-- [Qiling 프레임워크(교차 플랫폼 에뮬레이션)](#qiling-framework-cross-platform-emulation)
-  - [Qiling 설치](#qiling-installation)
-  - [기본 사용법](#basic-usage)
-  - [에뮬레이션을 통한 디버그 우회 방지](#anti-debug-bypass-via-emulation)
-  - [Qiling으로 퍼징 입력](#input-fuzzing-with-qiling)
-- [트리톤(동적 기호 실행)](#triton-dynamic-symbolic-execution)
-- [인텔 핀 명령어 카운팅 사이드 채널(Hackover CTF 2015)](#intel-pin-instruction-counting-side-channel-hackover-ctf-2015)
-- [유전 알고리즘을 사용한 인텔 핀 명령 계산(hxp CTF 2017)](#intel-pin-instruction-counting-with-genetic-algorithm-hxp-ctf-2017)
-- [Opcode 전용 추적 재구성(0CTF 2016)](#opcode-only-trace-reconstruction-0ctf-2016)
-- [결정론적 분석을 위한 LD_PRELOAD 시간() 동결(EKOPARTY 2017)](#ld_preload-time-freeze-for-deterministic-analytic-ekoparty-2017)
-- [바이트별 Bruteforce를 위한 LD_PRELOAD memcmp 사이드 채널(Blaze CTF 2018)](#ld_preload-memcmp-side-channel-for-byte-by-byte-bruteforce-blaze-ctf-2018)
+  - [일반적인 CTF 작업 흐름](#일반적인-ctf-작업-흐름)
+- [Qiling 프레임워크(교차 플랫폼 에뮬레이션)](#qiling-프레임워크교차-플랫폼-에뮬레이션)
+  - [Qiling Installation](#qiling-installation)
+  - [Basic Usage](#basic-usage)
+  - [에뮬레이션을 통한 디버그 방지 우회](#에뮬레이션을-통한-디버그-방지-우회)
+  - [Qiling을 사용한 입력 퍼징](#qiling을-사용한-입력-퍼징)
+- [Triton(동적 기호 실행)](#triton동적-기호-실행)
+- [Intel 핀 명령 계산 부채널(Hackover CTF 2015)](#intel-핀-명령-계산-부채널hackover-ctf-2015)
+  - [유전 알고리즘을 사용한 인텔 핀 명령어 계산(hxp CTF 2017)](#유전-알고리즘을-사용한-인텔-핀-명령어-계산hxp-ctf-2017)
+- [Opcode 전용 추적 재구성(0CTF 2016)](#opcode-전용-추적-재구성0ctf-2016)
+- [결정론적 분석을 위한 LD_PRELOAD time() 동결(EKOPARTY 2017)](#결정론적-분석을-위한-ld_preload-time-동결ekoparty-2017)
+- [바이트별 Bruteforce를 위한 LD_PRELOAD memcmp 사이드 채널(Blaze CTF 2018)](#바이트별-bruteforce를-위한-ld_preload-memcmp-사이드-채널blaze-ctf-2018)
 
 ---
 
@@ -57,10 +57,10 @@ frida --version
 
 ```javascript
 // hook.js — intercept a function and log arguments/return value
-Interceptor.attach(Module.findExportByName(null, "strcmp"), {
+Interceptor.attach(Module.getGlobalExportByName("strcmp"), {
     onEnter: function(args) {
-        this.arg0 = Memory.readUtf8String(args[0]);
-        this.arg1 = Memory.readUtf8String(args[1]);
+        this.arg0 = args[0].readUtf8String();
+        this.arg1 = args[1].readUtf8String();
         console.log(`strcmp("${this.arg0}", "${this.arg1}")`);
     },
     onLeave: function(retval) {
@@ -74,13 +74,13 @@ Interceptor.attach(Module.findExportByName(null, "strcmp"), {
 frida -p $(pidof binary) -l hook.js
 
 # Spawn and instrument from start
-frida -f ./binary -l hook.js --no-pause
+frida -f ./binary -l hook.js
 
 # One-liner: hook strcmp and dump comparisons
-frida -f ./binary --no-pause -e '
-Interceptor.attach(Module.findExportByName(null, "strcmp"), {
+frida -f ./binary -e '
+Interceptor.attach(Module.getGlobalExportByName("strcmp"), {
     onEnter(args) {
-        console.log("strcmp:", Memory.readUtf8String(args[0]), Memory.readUtf8String(args[1]));
+        console.log("strcmp:", args[0].readUtf8String(), args[1].readUtf8String());
     }
 });
 '
@@ -90,7 +90,7 @@ Interceptor.attach(Module.findExportByName(null, "strcmp"), {
 
 ```javascript
 // Bypass ptrace(PTRACE_TRACEME) — returns 0 (success) without calling
-Interceptor.attach(Module.findExportByName(null, "ptrace"), {
+Interceptor.attach(Module.getGlobalExportByName("ptrace"), {
     onEnter: function(args) {
         this.request = args[0].toInt32();
     },
@@ -103,7 +103,7 @@ Interceptor.attach(Module.findExportByName(null, "ptrace"), {
 });
 
 // Bypass IsDebuggerPresent (Windows)
-var isDbg = Module.findExportByName("kernel32.dll", "IsDebuggerPresent");
+var isDbg = Process.getModuleByName("kernel32.dll").getExportByName("IsDebuggerPresent");
 Interceptor.attach(isDbg, {
     onLeave: function(retval) {
         retval.replace(ptr(0));
@@ -111,12 +111,16 @@ Interceptor.attach(isDbg, {
 });
 
 // Bypass timing checks — hook clock_gettime to return constant
-Interceptor.attach(Module.findExportByName(null, "clock_gettime"), {
+Interceptor.attach(Module.getGlobalExportByName("clock_gettime"), {
+    onEnter: function(args) {
+        this.ts = args[1];
+    },
     onLeave: function(retval) {
-        // Force constant timestamp to defeat timing checks
-        var ts = this.context.rsi || this.context.x1; // x86 or ARM
-        Memory.writeU64(ts, 0);        // tv_sec
-        Memory.writeU64(ts.add(8), 0); // tv_nsec
+        if (retval.toInt32() === 0) {
+            // 64-bit Unix timespec; adjust field widths for a 32-bit target.
+            this.ts.writeU64(0);        // tv_sec
+            this.ts.add(8).writeU64(0); // tv_nsec
+        }
     }
 });
 ```
@@ -128,14 +132,14 @@ Interceptor.attach(Module.findExportByName(null, "clock_gettime"), {
 Process.enumerateRanges('r--').forEach(function(range) {
     Memory.scan(range.base, range.size, "66 6c 61 67 7b", { // "flag{"
         onMatch: function(address, size) {
-            console.log("[FLAG] Found at:", address, Memory.readUtf8String(address, 64));
+            console.log("[FLAG] Found at:", address, address.readUtf8String(64));
         },
         onComplete: function() {}
     });
 });
 
 // Patch instruction (NOP out a check)
-var addr = Module.findBaseAddress("binary").add(0x1234);
+var addr = Process.getModuleByName("binary").base.add(0x1234);
 Memory.patchCode(addr, 2, function(code) {
     var writer = new X86Writer(code, { pc: addr });
     writer.putNop();
@@ -148,9 +152,9 @@ Memory.patchCode(addr, 2, function(code) {
 
 ```javascript
 // Replace a validation function to always return true
-var checkFlag = Module.findExportByName(null, "check_flag");
+var checkFlag = Module.getGlobalExportByName("check_flag");
 Interceptor.replace(checkFlag, new NativeCallback(function(input) {
-    console.log("[*] check_flag called with:", Memory.readUtf8String(input));
+    console.log("[*] check_flag called with:", input.readUtf8String());
     return 1; // always valid
 }, 'int', ['pointer']));
 ```
@@ -159,18 +163,28 @@ Interceptor.replace(checkFlag, new NativeCallback(function(input) {
 
 ```javascript
 // Trace all calls in a function (Stalker — instruction-level tracing)
-var targetAddr = Module.findExportByName(null, "main");
-Stalker.follow(Process.getCurrentThreadId(), {
-    transform: function(iterator) {
-        var instruction;
-        while ((instruction = iterator.next()) !== null) {
-            if (instruction.mnemonic === "call") {
-                iterator.putCallout(function(context) {
-                    console.log("CALL at", context.pc, "→", ptr(context.pc).readPointer());
-                });
+var targetAddr = Module.getGlobalExportByName("main");
+Interceptor.attach(targetAddr, {
+    onEnter: function() {
+        this.threadId = Process.getCurrentThreadId();
+        Stalker.follow(this.threadId, {
+            transform: function(iterator) {
+                var instruction;
+                while ((instruction = iterator.next()) !== null) {
+                    if (instruction.mnemonic === "call") {
+                        const callSite = instruction.address;
+                        iterator.putCallout(function() {
+                            console.log("CALL at", callSite);
+                        });
+                    }
+                    iterator.keep();
+                }
             }
-            iterator.keep();
-        }
+        });
+    },
+    onLeave: function() {
+        Stalker.unfollow(this.threadId);
+        Stalker.garbageCollect();
     }
 });
 ```
@@ -197,7 +211,7 @@ adb push frida-server /data/local/tmp/
 adb shell "chmod 755 /data/local/tmp/frida-server && /data/local/tmp/frida-server &"
 
 # Hook Android Java methods
-frida -U -f com.example.app -l hook_android.js --no-pause
+frida -U -f com.example.app -l hook_android.js
 ```
 
 ```javascript
@@ -245,7 +259,7 @@ Interceptor.attach(funcAddr, {
 
 ```bash
 # Usage
-frida -f ./binary -l memo_hook.js --no-pause
+frida -f ./binary -l memo_hook.js
 ```
 
 다중 인수 함수의 경우 복합 키를 빌드합니다.
@@ -265,6 +279,8 @@ Interceptor.attach(funcAddr, {
 ```
 
 **주요 통찰력:** Frida의 `Interceptor`는 레지스터 상태를 읽고 수정할 수 있으므로 `rax`(반환 값) 및 `rip`(`ret` 명령어로)를 설정하여 함수 실행을 완전히 건너뛸 수 있습니다. 이는 동일한 인수가 동일한 결과를 생성하는 모든 재귀 함수에서 작동합니다. 지수 시간 재귀 계산(Fibonacci, Ackermann, 트리 순회)은 메모화에 따라 선형이 됩니다.
+
+이 예제는 x86-64의 정수 반환 ABI와 검증한 `ret` 주소를 전제로 합니다. 함수가 순수하고 동일한 전체 인수·전역 상태에서 같은 결과를 내며, 숨겨진 부작용·포인터 출력·예외·thread-local 상태가 없을 때만 적용하세요. 다른 ABI·반환형·재귀 형태에서는 stack/register 상태를 별도로 모델링해야 합니다.
 
 **참고자료:** hxp CTF 2017
 
@@ -434,7 +450,9 @@ class SHA256Hook(angr.SimProcedure):
 proj.hook_symbol('SHA256', SHA256Hook())
 ```
 
-### 분노 CFG 회복
+`ZERO_FILL_UNCONSTRAINED_*`는 미정 값을 0으로 고정해 경로를 잃을 수 있고, 위 SHA-256 summary는 symbolic data와 length에서 임의의 한 모델을 concretize합니다. 둘 다 성능용 근사이며 결과의 soundness를 보장하지 않습니다. concretization이 유일한지 확인하거나 원래 함수로 후보를 재실행하고, 다른 모델에서도 결과가 유지되는지 검증하세요.
+
+### angr CFG 복구
 
 ```python
 # Control flow graph for understanding structure
@@ -452,7 +470,7 @@ node = cfg.model.get_any_node(0x401234)
 print("Predecessors:", [hex(p.addr) for p in cfg.model.get_predecessors(node)])
 ```
 
-**주요 통찰력:** angr은 명확한 success/failure 경로가 있는 플래그 검사기 바이너리에서 가장 잘 작동합니다. 복잡한 바이너리의 경우 비용이 많이 드는 기능(crypto, I/O)을 연결하고 DFS 탐색을 사용하세요. 제약 조건을 추가하기 전에 가장 간단한 접근 방식(단지 find/avoid 주소)부터 시작하세요. 분노가 느린 경우 입력을 인쇄 가능한 ASCII로 제한하고 알려진 접두사를 추가하세요.
+**주요 통찰력:** angr은 명확한 success/failure 경로가 있는 플래그 검사기 바이너리에서 가장 잘 작동합니다. 복잡한 바이너리의 경우 비용이 많이 드는 기능(crypto, I/O)을 검증된 summary로 연결하고 DFS 탐색을 사용하세요. 제약 조건을 추가하기 전에 가장 간단한 접근 방식(find/avoid 주소)부터 시작하세요. angr이 느린 경우 입력을 인쇄 가능한 ASCII로 제한하고 알려진 접두사를 추가하세요.
 
 **사용 시기:** 분기 논리, maze/path-finding 바이너리, 제약이 많은 검사, 자동화된 바이너리 분석으로 유효성 검사기에 플래그를 지정합니다. 덜 효과적인 경우: 무거운 암호화, 부동 소수점 수학, 복잡한 힙 작업.
 
@@ -464,7 +482,7 @@ macOS/iOS.용 기본 디버거는 Linux에서도 작동합니다. Swift/Objectiv
 
 ### Basic Commands
 
-```bash
+```text
 lldb ./binary
 (lldb) run                          # Run program
 (lldb) b main                       # Breakpoint on main
@@ -582,6 +600,7 @@ ql.run()
 
 ```python
 from qiling import Qiling
+from qiling.const import QL_INTERCEPT
 
 ql = Qiling(["./binary"], "rootfs/x8664_linux")
 
@@ -590,7 +609,7 @@ def hook_ptrace(ql, ptrace_request, pid, addr, data):
     ql.log.info("ptrace bypassed")
     return 0
 
-ql.os.set_syscall("ptrace", hook_ptrace)
+ql.os.set_syscall("ptrace", hook_ptrace, QL_INTERCEPT.CALL)
 
 # Hook specific address (e.g., anti-VM check)
 def skip_check(ql):
@@ -608,10 +627,14 @@ ql.run()
 # Emulate binary with different inputs to find flag
 import string
 from qiling import Qiling
+from qiling.const import QL_VERBOSE
+from qiling.extensions import pipe
 
 def test_input(candidate):
-    ql = Qiling(["./binary"], "rootfs/x8664_linux",
-                verbose=QL_VERBOSE.DISABLED, stdin=candidate.encode())
+    ql = Qiling(["./binary"], "rootfs/x8664_linux", verbose=QL_VERBOSE.DISABLED)
+    ql.os.stdin = pipe.SimpleInStream(0)
+    ql.os.stdout = pipe.SimpleOutStream(1)
+    ql.os.stdin.write(candidate.encode())
     ql.run()
     return ql.os.stdout.read()
 
@@ -622,12 +645,12 @@ for ch in string.printable:
 ```
 
 **GDB/Frida 이상의 장점:**
-- 디버거 아티팩트 없음(기본적으로 모든 안티 디버그 우회)
+- 디버거 아티팩트는 적지만 API/syscall 및 안티 분석 검사는 대상별로 후크 필요
 - 하드웨어가 없는 크로스 플랫폼(x86 호스트의 ARM, MIPS, RISC-V)
 - Python으로 스크립팅 가능(GDB보다 빠른 반복)
 - Snapshot/restore 무차별 공격의 경우
 
-**주요 통찰력:** Qiling은 CPU뿐만 아니라 전체 OS 계층(syscall, 파일 시스템, 레지스트리)을 에뮬레이트합니다. 이는 `ptrace(TRACEME)`와 같은 디버그 방지 검사가 패치 없이 자연스럽게 성공을 반환하고 QEMU나 실제 하드웨어 없이 x86 호스트에서 ARM/MIPS 바이너리를 분석할 수 있음을 의미합니다.
+**주요 통찰력:** Qiling은 CPU 외에 syscall, 파일 시스템, 레지스트리 같은 OS 계층을 에뮬레이트합니다. 구현되지 않았거나 실제 커널과 다른 API/syscall이 있으며 `ptrace(TRACEME)` 같은 검사도 자동으로 올바른 결과를 낸다고 가정할 수 없습니다. 필요한 동작을 대상별로 후크하고 실제 플랫폼 또는 다른 에뮬레이터와 교차 검증하세요.
 
 **사용 시기:** 외부 아키텍처 바이너리, IoT 펌웨어, 강력한 안티 디버그, 많은 입력에 대한 자동화된 테스트.
 
@@ -635,7 +658,7 @@ for ch in string.printable:
 
 ## Triton(동적 기호 실행)
 
-전체 Triton 참조는 [tools-advanced.md](tools-advanced.md#triton-dynamic-symbolic-execution)을 참조하세요. 빠른 사용법:
+전체 Triton 참조는 [tools-advanced.md](tools-advanced.md#triton동적-기호-실행)을 참조하세요. 빠른 사용법:
 
 ```python
 from triton import *
@@ -643,13 +666,20 @@ from triton import *
 ctx = TritonContext(ARCH.X86_64)
 
 # Symbolize input buffer
+input_symbols = []
 for i in range(32):
-    ctx.symbolizeMemory(MemoryAccess(0x600000 + i, CPUSIZE.BYTE), f"flag_{i}")
+    sym = ctx.symbolizeMemory(MemoryAccess(0x600000 + i, CPUSIZE.BYTE), f"flag_{i}")
+    input_symbols.append(sym)
 
 # Process instructions and collect constraints
 # At comparison point, solve for flag
-model = ctx.getModel(ctx.getPathConstraintsAst())
-flag = ''.join(chr(v.getValue()) for _, v in sorted(model.items()))
+model = ctx.getModel(ctx.getPathPredicate())
+flag = bytearray()
+for sym in input_symbols:
+    if sym.getId() not in model:
+        raise ValueError(f"unconstrained input symbol: {sym.getName()}")
+    flag.append(model[sym.getId()].getValue())
+print(bytes(flag))
 ```
 
 **주요 통찰력:** Triton은 angr의 경로 폭발이 문제가 되는 단일 경로 DSE(동적 기호 실행)에 탁월합니다. 구체적인 실행 추적을 제공하고, 특정 입력을 기호화하고, 비교 지점에서 제약 조건을 해결합니다. 실행 흐름이 알려진 선형 코드 경로의 경우 angr보다 빠릅니다.
@@ -759,7 +789,7 @@ VOID Instruction(INS ins, VOID *v) {
 }
 ```
 
-**주요 통찰력:** 각각의 올바른 문자가 새로운 코드 섹션의 잠금을 해제하면(자체 수정 또는 다단계 암호 해독) 명령 수가 정확성에 따라 단조롭게 증가합니다. 유전자 알고리즘은 여러 개의 올바른 문자를 동시에 발견할 수 있기 때문에 문자별 무차별 대입보다 입력 공간을 더 효율적으로 탐색합니다. 40자 플래그의 경우 약 30분 안에 수렴됩니다. 총 명령어 수가 상관 관계가 없는 테이블 조회 비교의 경우 대신 특정 분기 주소를 대상으로 합니다.
+**주요 통찰력:** 각각의 올바른 문자가 새로운 코드 섹션의 잠금을 해제하고 명령 수가 정확성에 따라 단조롭게 증가하는 대상에서만 이 fitness가 유효합니다. 유전 알고리즘의 수렴 시간과 성공 여부는 대상·seed·population·하드웨어에 따라 달라지며 보장되지 않습니다. 총 명령어 수가 상관 관계가 없는 테이블 조회 비교의 경우 검증한 특정 분기 주소를 대상으로 합니다.
 
 **참고자료:** hxp CTF 2017
 
@@ -817,29 +847,38 @@ int rand(void) { return 42; }
 
 ---
 
-### 바이트별 Bruteforce를 위한 LD_PRELOAD memcmp 사이드 채널(Blaze CTF 2018)
+## 바이트별 Bruteforce를 위한 LD_PRELOAD memcmp 사이드 채널(Blaze CTF 2018)
 
-**패턴:** `memcmp`를 표준 -1/0/1 결과 대신 일치하는 바이트 수를 반환하는 LD_PRELOAD 라이브러리로 바꾸세요. 이는 모든 memcmp 기반 검증을 바이트 단위 오라클로 변환합니다. GDB Python 스크립팅으로 자동화하여 각 문자 위치를 무차별 대입합니다.
+**패턴:** `memcmp`의 원래 음수/0/양수 반환 의미를 보존하면서 공통 접두사 길이를 별도 로그로 기록합니다. 검증 함수가 접두사 비교를 수행하는 이 사례에서는 로그를 바이트 단위 오라클로 사용할 수 있습니다.
 
 ```c
 // memcmp_hook.c - compile: gcc -shared -fPIC -o hook.so memcmp_hook.c
-int memcmp(const char *s1, const char *s2, int n) {
-    int cnt = 0;
-    for (int i = 0; i < n; ++i) {
-        if (s1[i] == s2[i]) cnt++;
-        else break;
-    }
-    return cnt;
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <stddef.h>
+#include <stdio.h>
+
+int memcmp(const void *p1, const void *p2, size_t n) {
+    static int (*real_memcmp)(const void *, const void *, size_t);
+    if (!real_memcmp)
+        real_memcmp = dlsym(RTLD_NEXT, "memcmp");
+
+    const unsigned char *s1 = p1;
+    const unsigned char *s2 = p2;
+    size_t prefix = 0;
+    while (prefix < n && s1[prefix] == s2[prefix])
+        ++prefix;
+    fprintf(stderr, "MEMCMP_PREFIX=%zu\n", prefix);
+    return real_memcmp(p1, p2, n);
 }
 ```
 
 ```bash
-# Use with GDB: LD_PRELOAD=./hook.so gdb ./binary
-# Set breakpoint after memcmp, read return value to count matching bytes
-# Iterate characters at each position to find the one that increases count
+# Capture MEMCMP_PREFIX from stderr for each candidate. Verify that the logged
+# comparison is the target validation call, not an unrelated library call.
 ```
 
-**주요 통찰력:** 일치 개수를 반환하기 위해 LD_PRELOAD를 통해 memcmp를 교체하면 모든 비교 기반 검증이 바이트별 오라클로 변환됩니다. GDB 스크립팅과 결합하면 유효성 검사 알고리즘을 되돌리지 않고 password/flag 검사의 무차별 대입을 자동화합니다.
+**주요 통찰력:** 비교 의미를 바꾸지 않고 접두사 길이를 기록하면 해당 `memcmp` 호출이 순차 검증하는 대상에서만 오라클을 만들 수 있습니다. 모든 `memcmp` 호출이 비밀 비교인 것은 아니며 constant-time 비교·변환된 버퍼·다중 후보 비교에는 그대로 적용되지 않습니다.
 
 **탐지:** 바이너리는 플래그 확인을 위해 `memcmp` 또는 `strcmp`를 사용합니다(`ltrace` 출력 또는 가져오기 테이블에 표시됨). 비교 함수는 사용자 입력과 computed/stored 예상 값을 사용하여 호출됩니다.
 

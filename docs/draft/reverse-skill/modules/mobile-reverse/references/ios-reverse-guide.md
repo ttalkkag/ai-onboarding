@@ -12,7 +12,7 @@ ipatool download -b com.target.app -o app.ipa
 # 탈옥된 기기
 scp root@device:/private/var/containers/Bundle/Application/*/Target.app .
 
-# 암호 해독(App Store 바이너리는 암호화된 FAT 형식임)
+# 암호 해독(App Store 배포 바이너리의 FairPlay 암호화 여부 확인; FAT/thin 형식과는 별개)
 # frida-ios-dump (권장)
 python3 dump.py com.target.app -o decrypted.ipa
 
@@ -40,7 +40,8 @@ lipo TargetBinary -thin arm64 -output TargetBinary_arm64
 # 상징적 분석
 nm -g TargetBinary                    # 기호 내보내기
 nm -a TargetBinary                    # 모든 기호
-swift-demangle <mangled_name>         # 신속한 기호 복원
+MANGLED_NAME='REPLACE_WITH_MANGLED_NAME'
+swift-demangle "$MANGLED_NAME"        # Swift 기호 복원
 
 # class-dump
 class-dump -H TargetBinary -o headers/
@@ -77,7 +78,11 @@ Interceptor.attach(hook.implementation, {
 
 // Hook 수업 방법
 var hook = ObjC.classes.ClassName["+ classMethod:"];
-Interceptor.attach(hook.implementation, { ... });
+Interceptor.attach(hook.implementation, {
+    onEnter: function(args) {
+        console.log("classMethod: called");
+    }
+});
 
 // ObjC 메서드 호출
 var NSString = ObjC.classes.NSString;
@@ -137,23 +142,24 @@ $s10ModuleName5ClassC6method3argSi_tF
 ```javascript
 // 파일 탐지 우회
 var NSFileManager = ObjC.classes.NSFileManager;
-var defaultManager = NSFileManager.defaultManager();
-Interceptor.attach(defaultManager["- fileExistsAtPath:"].implementation, {
+Interceptor.attach(NSFileManager["- fileExistsAtPath:"].implementation, {
+    onEnter: function(args) {
+        this.path = new ObjC.Object(args[2]).toString();
+    },
     onLeave: function(retval) {
-        var path = ObjC.Object(args[2]).toString();
-        if (path.includes("Cydia") || path.includes("apt") ||
-            path.includes("sshd") || path.includes("bash")) {
+        if (this.path.includes("Cydia") || this.path.includes("apt") ||
+            this.path.includes("sshd") || this.path.includes("bash")) {
             retval.replace(0); // false
         }
     }
 });
 
 // 포크 바이패스
-Interceptor.replace(Module.findExportByName(null, "fork"),
+Interceptor.replace(Module.findGlobalExportByName("fork"),
     new NativeCallback(function() { return -1; }, 'int', []));
 
 // 딜드 바이패스
-var _dyld_get_image_count = Module.findExportByName(null, "_dyld_get_image_count");
+var _dyld_get_image_count = Module.findGlobalExportByName("_dyld_get_image_count");
 Interceptor.attach(_dyld_get_image_count, {
     onLeave: function(retval) {
         if (retval.toInt32() > 200) retval.replace(200);
@@ -172,6 +178,6 @@ Interceptor.attach(_dyld_get_image_count, {
 | 무결성 검사| 후크 MAC 확인/코드 서명 확인|
 | 등 주사| __RESTRICT 섹션을 제거하려면 Mach-O를 수정하세요.|
 | 신속한 난독화| Swift-demangle + LLM 보조 의미 복구|
-| 스크린샷 보호| 후크 UIScreen.mainScreen.snapshotViewAfterScreenUpdates|
+| 스크린샷/화면 캡처 대응| `userDidTakeScreenshotNotification`은 촬영 후 알림이고, 진행 중 캡처는 `UIScreen.isCaptured`/`capturedDidChangeNotification`을 관찰합니다. `snapshotView(afterScreenUpdates:)`는 보호 우회 API가 아닙니다.|
 
-Source: OWASP MSTG, frida-ios-dump, 아이폰 위키
+Source: OWASP MASTG, frida-ios-dump, Apple UIKit 문서

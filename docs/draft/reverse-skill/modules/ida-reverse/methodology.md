@@ -5,12 +5,28 @@ description: |
 
   사용자가 "IDA" 또는 "리버스 엔지니어링"을 명시적으로 언급하는지 여부에 관계없이 바이너리 파일을 분석하려는 경우 이 기술을 사용하십시오. 여기에는 "이 exe 보기", "이 dll 분석", "해독 도움말", "비밀번호 찾기", "이 소프트웨어 등록 방법" 등과 같은 요청이 포함됩니다.
 
-  결정론적 서버 관리 및 파일 열기를 위해 번들 스크립트(scripts/start.ps1, scripts/open.ps1)를 사용하십시오. 이러한 작업에 대해 임시 PowerShell 명령을 작성하지 마십시오.
+  현재 MCP 클라이언트가 실제로 공개한 도구와 상류 ida-pro-mcp 문서를 확인한 뒤 사용하십시오.
 ---
 
 # IDA 프로 역분석 기술
 
-## 알려진 문제 및 고찰(필독)
+> **상태 경고(2026-07-18):** 이 파일의 `idapro_*` 도구 목록과 Windows PowerShell 운영 절차는 레거시 스냅샷입니다. 현재 큐레이션에는 `scripts/start.ps1`·`scripts/open.ps1`가 없고, 상류 프로젝트는 GUI MCP 플러그인 대신 `idalib-mcp`를 권장합니다. 현재 상류 `main`(`1be78d0`, 2026-07-13)의 세션 API는 `idb_open()`·`idb_list()`·`idb_save()`이며 `idb_close()`는 없습니다. 데이터베이스 분석 도구 호출은 `idb_open()`이 반환한 세션 ID를 `database`에 명시해야 합니다. 실제 서버가 공개한 스키마를 확인하기 전에는 아래 레거시 명령을 실행 가능한 계약으로 취급하지 마세요.
+
+## 현재 상류의 최소 세션 계약
+
+```text
+idb_open("/absolute/path/to/target", preferred_session_id="target")
+# 반환된 실제 세션 ID를 기록한다(기존 worker/GUI를 채택하면 선호 ID와 다를 수 있음).
+decompile("main", database="<returned-session-id>")
+idb_save("<returned-session-id>")  # 저장이 필요할 때만
+```
+
+현재 모델에는 암묵적 “현재 데이터베이스”가 없습니다. `database`는 파일명이나 경로가 아니라
+반환된 세션 ID만 받습니다. headless worker는 supervisor보다 오래 살아남고 기본 유휴 TTL 뒤
+자체 종료하므로, 닫기 도구가 있다고 가정하지 마세요. 설치·전송 방식과 도구 스키마는 실행
+시점의 [상류 README](https://github.com/mrexodia/ida-pro-mcp)를 우선합니다.
+
+## 레거시 스냅샷: 알려진 문제 및 고찰(실행 금지)
 
 ### 밟혀진 구덩이들
 
@@ -281,12 +297,12 @@ idapro_rename(batch={"func": [{"addr": "함수 주소", "name": "의미 있는 �
 
 ## 라우팅 컨텍스트
 
-**상류 입구**: `../../SKILL.md`(마스터 제어), `routing.md`
+**상류 입구**: `../../SKILL.md`(마스터 제어), `../../routing.md`
 **업스트림 대안**: `radare2/` (IDA을 열고 싶지 않다면 먼저 r2를 빠르게 스카우트할 수 있습니다)
 **다운스트림 내보내기**:
 - Frida 동적 확인 → `reverse-engineering/tools-dynamic.md` 필요
 - 기호 실행 필요 /angr → `reverse-engineering/tools-dynamic.md`
-- 보편적인 역방향 방법론이 필요하다 → `reverse-engineering/SKILL.md`
+- 보편적인 역방향 방법론이 필요하다 → `../reverse-engineering/methodology.md`
 
 **유사한 연결 모듈**: `radare2/`(IDA을 사용할 수 없는 경우 대체 솔루션)
 
@@ -294,43 +310,28 @@ idapro_rename(batch={"func": [{"addr": "함수 주소", "name": "의미 있는 �
 
 ## 주문형 부트스트랩
 
-해당 스킬의 진입 스크립트가 통합 부트스트래핑 시스템에 연결되었습니다.
+현재 큐레이션에는 자동 부트스트랩이 없습니다. 아래는 외부 상류 도구를 별도로 도입할 때의 최소 전제 조건입니다.
 
 ### 자동화 기능 경계
 
 | 도구| 자동으로 설치 가능| 설치방법| 설명|
 |------|-----------|---------|------|
-| idalib-mcp | ✓ | pip 설치(GitHub에서)| `start.ps1` 누락된 경우 자동으로 설치됩니다.|
+| idalib-mcp | ✗ | 상류 ida-pro-mcp 설치 지침 | Python 3.11+, 활성화된 idalib, uv 필요 |
 | IDA 프로 바디| ✗ | 상용 소프트웨어, 수동 설치 필요| 설치 디렉터리를 가리키도록 `IDADIR` 환경 변수를 설정합니다.|
 
-### 설치 단계(검증됨)
+### 설치 방향
 
 ```cmd
-# 1. IDA 경로를 설정합니다(실제 IDA 설치 디렉터리로 교체)
-setx IDADIR "<IDA_설치_디렉터리>"
+# idalib 활성화 후, stdio 기반 MCP 서버 예
+uv run idalib-mcp --stdio
 
-# 2. GitHub에서 ida-pro-mcp를 설치합니다(PyPI의 ida-mcp는 또 다른 프로젝트이므로 잘못 설치하지 마세요!)
-pip install git+https://github.com/mrexodia/ida-pro-mcp.git
-
-# 3. IDA 플러그인 설치(스트리밍 가능 HTTP + 글로벌 선택 + 모든 클라이언트 선택)
-ida-pro-mcp --install
-
-# 4. IDA Pro를 다시 시작하고 대상 파일을 엽니다.
-# 플러그인은 127.0.0.1:13337을 자동으로 모니터링합니다.
-
-# 5. 검증
-ida-pro-mcp --config
+# 또는 로컬 HTTP 서버에서 바이너리 열기
+uv run idalib-mcp --host 127.0.0.1 --port 8745 path/to/executable
 ```
 
-> ⚠️ **참고**: PyPI의 `ida-mcp` 패키지(jtsylve 제공)는 다른 프로젝트에서 가져온 것이므로 우리에게 필요한 패키지는 아닙니다.
-> GitHub에서 `mrexodia/ida-pro-mcp`를 설치해야 합니다.
-
-### 부트스트랩 트리거 포인트
-
-- `scripts/start.ps1`: `idalib-mcp`이 누락되면 자동으로 `bootstrap-reverse.ps1`를 호출합니다.
-- MCP 등록: 부트스트랩은 자동으로 Claude MCP 구성에 `idapro`를 씁니다.
+구체적인 설치와 클라이언트 등록 명령은 `mrexodia/ida-pro-mcp`의 현재 README를 따르세요. GUI 플러그인 설치 경로는 상류에서 비권장·향후 폐기 예정입니다.
 
 ### 전제 조건
 
-- IDA Pro가 설치되고 `IDADIR` 환경 변수가 설정되었습니다(또는 스크립트 내의 기본 경로가 정확함).
-- Python이 설치되었습니다(idalib-mcp는 Python에 따라 다름).
+- IDA Pro 8.3 이상(상류는 9 권장)과 활성화된 idalib가 필요하며 IDA Free는 지원되지 않습니다.
+- Python 3.11 이상과 uv가 필요합니다.

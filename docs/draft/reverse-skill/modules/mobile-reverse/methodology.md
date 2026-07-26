@@ -1,7 +1,9 @@
-﻿# 모바일 리버스 엔지니어링
+# 모바일 리버스 엔지니어링
 
 > Android + iOS 통합 역방향 방법론
-> Frida / Objection / OWASP MSTG / SSL 고정 우회
+> Frida / Objection / OWASP MASTG / SSL 고정 우회
+
+소유하거나 명시적으로 테스트 승인을 받은 앱과 격리된 테스트 기기에서만 사용합니다.
 
 ## 적용 가능한 시나리오
 
@@ -11,7 +13,7 @@
 - SSL 고정 / 루트 감지 / 탈옥 감지 우회
 - 모바일 암호화 알고리즘 추출(AES/RSA/HMAC 키)
 - 모바일 애플리케이션 침투 테스트(OWASP MASTG)
-- 루팅되지 않은/탈옥된 환경에서 애플리케이션 테스트
+- 루팅·탈옥 여부가 다른 승인된 테스트 환경에서 애플리케이션 동작 비교
 
 ## 4단계 워크플로
 
@@ -49,7 +51,7 @@ Android Special:
 iOS Special:
 □ class-dump: Export ObjC header files
 □ Swift symbol recovery: swift-demangle
-□ dsymutil: debugging symbol extraction
+□ dsymutil: 기존 오브젝트 파일의 DWARF를 dSYM 번들로 연결(스트립된 바이너리에서 사라진 심볼을 복구하지는 않음)
 □ otool -L: View dynamic library dependencies
 □ jtool2: Mach-O Analysis
 ```
@@ -63,16 +65,16 @@ Frida — Universal dynamic instrumentation:
 □ Custom Hook script: modify parameters/return values, call private methods
 
 Objection — Frida Enhancement layer (no scripting required):
-□ objection -g "com.app" explore
+□ objection -n "com.app" start
 □ android root disable / ios jailbreak disable
 □ android sslpinning disable / ios sslpinning disable
 □ android keystore list / ios keychain dump
 □ env / ls / sqlite connect
 
-Frida Gadget (free of Root/jailbreak):
+Frida Gadget (루트/탈옥 없이 앱 재패키징 방식):
 □ Inject frida-gadget.so / FridaGadget.dylib into APK/IPA
-□ Re-sign → Install → No device permissions required Hook
-□ objection patchapk --source app.apk (fully automatic)
+□ 재서명 → 설치(플랫폼 서명·무결성 검사 및 배포 제한을 충족해야 함)
+□ objection patchapk --source app.apk (지원되는 APK에서 재패키징 보조)
 ```
 
 ### 4단계: 네트워크 분석
@@ -81,7 +83,7 @@ Frida Gadget (free of Root/jailbreak):
 □ Burp Suite: Intercept HTTP/HTTPS, modify request/response
 □ mitmproxy: Scriptable proxy (Python API)
 □ Wireshark: PCAP packet capture analysis
-□ Certificate installation: Android User certificate → System certificate (Magisk + MoveCert)
+□ 인증서 설치: Android 7+ 앱은 기본적으로 사용자 CA를 신뢰하지 않으므로 테스트용 Network Security Configuration 또는 승인된 계측을 사용
 □ SSL Pinning Bypass: Frida/Objection/Xposed/SSL Kill Switch 2
 □ WebSocket / gRPC traffic analysis
 ```
@@ -92,7 +94,7 @@ Frida Gadget (free of Root/jailbreak):
 
 ```bash
 # Objection(simplest)
-objection -g "com.app" explore
+objection -n "com.app" start
 android sslpinning disable
 
 # Frida Universal Script
@@ -104,7 +106,7 @@ TrustMeAlready 모듈 → 인증서 검증을 전역 비활성화
 
 ### 루트/탈옥 감지
 
-```bash
+```text
 # Objection
 android root disable
 ios jailbreak disable
@@ -145,8 +147,16 @@ Java.perform(function() {
     };
 });
 
+function bytesToHex(bytes) {
+    var hex = [];
+    for (var i = 0; i < bytes.length; i++) {
+        hex.push(('0' + (bytes[i] & 0xff).toString(16)).slice(-2));
+    }
+    return hex.join('');
+}
+
 // iOS — Hook CCCrypt
-Interceptor.attach(Module.findExportByName("libcommonCrypto.dylib", "CCCrypt"), {
+Interceptor.attach(Module.findGlobalExportByName("CCCrypt"), {
     onEnter: function(args) {
         console.log("CCCrypt op: " + args[0] + " alg: " + args[1]);
         console.log("Key: " + hexdump(args[3], { length: args[4].toInt32() }));

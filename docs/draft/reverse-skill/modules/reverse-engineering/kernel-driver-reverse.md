@@ -1,4 +1,4 @@
-# 커널 드라이버 역참조
+# 커널 드라이버 리버스 엔지니어링
 
 > Windows/Linux 커널 드라이버 리버스 엔지니어링, 루트킷 분석, C/C++ 바이너리 패턴 인식을 다룹니다.
 
@@ -6,7 +6,7 @@
 
 ## Windows 드라이버 리버스 엔지니어링
 
-### 드라이브 유형
+### 드라이버 유형
 
 | 유형| 특징| 분석 초점|
 |------|------|---------|
@@ -36,7 +36,7 @@
 
 5. 허점 찾기
    - 사용자가 제어 가능한 버퍼 미확인 길이 → 오버플로
-   - METHOD_NEITHER는 사용자 포인터를 직접 사용 → 임의 읽기 및 쓰기
+   - METHOD_NEITHER는 I/O 관리자가 검증하지 않은 사용자 포인터를 전달하므로 드라이버가 `ProbeForRead`/`ProbeForWrite`, 예외 처리, 길이 검증을 해야 합니다. 검증 결함이 있을 때 임의 읽기·쓰기 원시 동작으로 이어질 수 있습니다.
    - IOCTL 권한이 확인되지 않음 → 권한이 없는 사용자가 호출 가능
 ```
 
@@ -86,9 +86,9 @@ decode_ioctl(0x80002034)
 - cleanup_module / module_exit → 모듈 제거 시 실행
 
 주요 구조:
-- struct file_options → 캐릭터 디바이스의 open/read/write/ioctl
+- struct file_operations → 캐릭터 디바이스의 open/read/write/ioctl
 - struct net_device_ops → 네트워크 장치 작업
-- struct block_device_Operations → 블록 장치 작업
+- struct block_device_operations → 블록 장치 작업
 ```
 
 ### 분석과정
@@ -99,10 +99,10 @@ decode_ioctl(0x80002034)
 
 2. init/exit 기능 찾기
    readelf -s module.ko | grep -E "init_module|cleanup_module"
-   또는.modinfo 섹션에서 모듈 정보를 찾으세요.
+   `.modinfo`에는 라이선스·의존성·별칭 같은 메타데이터가 있으므로 init/exit 함수는 심볼과 `module_init`/`module_exit`가 만든 참조에서 찾으세요.
 
-3. file_Operations 구조를 찾으세요.
-   Register_chrdev/cdev_add/misc_register 검색
+3. file_operations 구조를 찾으세요.
+   register_chrdev/cdev_add/misc_register 검색
    → fops 구조 찾기 → ioctl/read/write 핸들러 함수 찾기
 
 4. ioctl 처리 분석
@@ -121,7 +121,7 @@ decode_ioctl(0x80002034)
 | 기술| 특징| 탐지 방법|
 |------|------|---------|
 | syscall 테이블 후크| `sys_call_table` 항목 수정| 인메모리 테이블과 온디스크 vmlinux 비교|
-| VFS hook | `file_operations` 함수 포인터 수정| fops 포인터가 커널 코드 세그먼트 외부를 가리키는지 확인하세요.|
+| VFS hook | `file_operations` 함수 포인터 수정| 각 포인터의 소유 모듈을 확인하고 알려진 커널·정상 모듈 텍스트와 비교하세요. 코어 커널 밖의 주소만으로는 후크라고 단정할 수 없습니다.|
 | Netfilter hook | `nf_register_net_hook` | netfilter 후크 연결 목록 탐색|
 | kprobe/ftrace 갈고리| kprobe 또는 ftrace 콜백 등록| ftrace 등록 목록 확인|
 | eBPF rootkit | 악성 BPF 프로그램 로드| `bpftool prog list` |
@@ -132,7 +132,7 @@ decode_ioctl(0x80002034)
 | 도구| 목적|
 |------|------|
 | `crash` | 커널 덤프 분석|
-| `volatility3` | 메모리 포렌식(Linux 프로필)|
+| `volatility3` | 메모리 포렌식(Volatility 3 Linux ISF 심볼 사용)|
 | `dmesg` / `journalctl` | 커널 로그|
 | `lsmod` / `/proc/modules` | 로드된 모듈 목록|
 | `modinfo` | 모듈 메타 정보|
@@ -160,16 +160,16 @@ decode_ioctl(0x80002034)
 
 | 소스 코드 모드| 분해 특성|
 |---------|-----------|
-| **가상 함수 호출**| `mov rax, [rcx]` (vtable 가져오기) → `call [rax+offset]` (가상 함수 호출)|
+| **가상 함수 호출**| 객체 포인터에서 vptr을 읽은 뒤 `call [reg+offset]`; 구체적인 레지스터는 ABI에 따라 다름|
 | **생성자**| 메모리 할당 → vtable 포인터 쓰기 → 멤버 초기화|
 | **소멸자**| 정리 회원 → 전화 가능 `operator delete`|
-| **이 포인터**| 첫 번째 매개변수(rcx/rdi)는 객체 포인터입니다.|
+| **this 포인터**| Microsoft x64에서는 보통 RCX, System V AMD64에서는 보통 RDI; ABI와 thunk를 먼저 확인|
 | **상속**| vtable에는 상위 클래스 가상 함수 + 하위 클래스 재정의가 포함되어 있습니다.|
 | **다중 상속**| 개체 내에 여러 개의 vtable 포인터가 있습니다(오프셋이 다름).|
-| **RTTI** |vtable 앞에 `type_info` 포인터가 있습니다.|
+| **RTTI** | Itanium ABI와 MSVC는 서로 다른 vtable/vftable 전위 메타데이터를 사용함|
 | **예외 처리**| `__cxa_throw` / `_CxxThrowException` |
-| **STL 컨테이너**| `std::vector`: `{begin, end, capacity}` 세 포인터 구조|
-| **std::string** | SSO(Small String Optimization): 짧은 문자열 인라인, 긴 문자열 힙 할당|
+| **STL 컨테이너**| `std::vector`가 세 포인터처럼 보이는 구현이 흔하지만 표준이 고정한 ABI는 아님|
+| **std::string** | SSO 방식과 필드 배치는 표준 라이브러리·ABI·버전에 따라 다름|
 
 ### vtable 역방향 방법
 
@@ -179,11 +179,12 @@ decode_ioctl(0x80002034)
    - `mov [rcx], offset vtable`는 생성자의 vtable 포인터에 기록됩니다.
 
 2. 클래스 계층 구조 결정
-   - vtable 앞의 -8 오프셋은 일반적으로 RTTI 포인터입니다(제거되지 않은 경우).
+   - Itanium C++ ABI에서는 address point 앞의 음수 인덱스에 offset-to-top과 RTTI가 있습니다.
+   - MSVC에서는 vftable 바로 앞 포인터 슬롯이 Complete Object Locator를 가리키는 구성이 흔합니다.
    - 여러 vtable이 처음 몇 개의 항목을 공유 → 상속 관계
 
 3. 가상 기능 표시
-   - vtable[0]은 일반적으로 소멸자(또는 삭제 소멸자)입니다.
+   - 첫 슬롯이 소멸자라고 가정하지 말고 호출 지점·RTTI·ABI의 destructor variant 규칙으로 확인합니다.
    - 오프셋에 의한 후속 주석: vtable[1] = func1, vtable[2] = func2...
 
 4. IDA에서의 작업
@@ -228,7 +229,8 @@ decode_ioctl(0x80002034)
 | -O0 | 많은 중복 mov, 스택의 모든 변수, 인라인되지 않은 함수|
 | -O1 | 기본 최적화, 레지스터의 일부 변수|
 | -O2 | 루프 언롤링, 함수 인라인, 테일 콜 최적화|
-| -O3 / -Os |급진적 인라인 처리, 벡터화(SIMD), 읽기 어려운 코드|
+| -O3 | 적극적 인라인·루프·벡터화 최적화가 나타날 수 있음|
+| -Os | 코드 크기 최적화; 크기를 늘리는 변환은 억제될 수 있음|
 | PGO | 핫 경로 최적화, 콜드 코드를 `.text.cold`로 분리|
 | LTO | 크로스 모듈 인라이닝, 전역 데드 코드 제거|
 
@@ -267,7 +269,7 @@ qemu-system-x86_64 -kernel bzImage -s -S ...
 gdb vmlinux -ex "target remote :1234"
 
 일반적으로 사용되는 명령:
-정보 스레드 # 커널 스레드
+info threads # 커널 스레드
 lx-symbols # 커널 기호 로드 (scripts/gdb/ 필요)
 p init_task # 초기화 프로세스 보기
 lx-dmesg # 커널 로그

@@ -15,7 +15,7 @@ description: 자연어, 메모, 코드 조각, 스키마, 테이블 또는 기�
 2. 아래 결정표를 사용하여 다이어그램 제품군과 언어를 선택하세요.
 3. 다이어그램 코드를 작성하기 전에 엔터티, 관계, 레이블, 상태, 분기 및 time/order 정보를 정규화하세요.
 4. 간결하고 읽기 쉬운 다이어그램 소스를 생성합니다.
-5. 정신적으로 구문을 검증하고, 파일을 생성할 때 `scripts/render_diagram.py`를 실행하세요.
+5. 구문을 검토하고, 파일을 생성할 때는 설치된 공식 렌더러로 실제 렌더링을 확인하세요.
 6. 소스 다이어그램과 가정에 대한 간단한 메모를 반환합니다. 파일이 생성되면 출력 파일에 대한 링크를 포함합니다.
 
 설명을 과도하게 요청하지 마십시오. 요청이 과소 지정되면 합리적인 가정을 하고 간략하게 라벨을 지정하세요.
@@ -102,14 +102,12 @@ description: 자연어, 메모, 코드 조각, 스키마, 테이블 또는 기�
 사용자가 PNG/SVG/PDF를 요청하면 소스 파일을 만들고 다음을 실행합니다.
 
 ```bash
-python "<SKILL_ROOT>/diagram-generator/scripts/render_diagram.py" input.mmd --format svg --out output.svg
-python "<SKILL_ROOT>/diagram-generator/scripts/render_diagram.py" input.dot --format png --out output.png
-python "<SKILL_ROOT>/diagram-generator/scripts/render_diagram.py" input.puml --format svg --out output.svg
+mmdc -i input.mmd -o output.svg
+dot -Tpng input.dot -o output.png
+java -jar plantuml.jar -tsvg input.puml
 ```
 
-> `<SKILL_ROOT>`는 이 패키지의 실제 `skills/` 디렉터리 경로이며, AI가 자동으로 감지해야 합니다.
-
-렌더러는 의도적으로 종속성을 허용합니다. 일반적인 로컬 도구를 시도하고 렌더러를 사용할 수 없는 경우 실행 가능한 설치 힌트를 보고합니다. 스크립트가 성공적으로 완료되고 출력 파일이 존재하지 않는 한 이미지가 렌더링되었다고 주장하지 마세요.
+각 명령은 해당 렌더러가 별도로 설치되어 있을 때만 실행할 수 있습니다. 이 저장소에는 통합 렌더링 스크립트가 포함되어 있지 않습니다. 명령이 성공하고 출력 파일이 존재하지 않는 한 이미지가 렌더링되었다고 주장하지 마세요.
 
 ## Validation checklist
 
@@ -126,7 +124,7 @@ Before finalizing:
 
 대부분의 다이어그램 답변에는 다음 구조를 사용하십시오.
 
-```markdown
+````markdown
 편집 가능한 [언어] 버전은 다음과 같습니다.
 
 ```[language]
@@ -137,7 +135,7 @@ Assumptions:
 - [only if needed]
 
 Rendered file: [link] [only if generated]
-```
+````
 
 영어 사용자 요청의 경우 영어로 응답합니다. 중국어 사용자 요청의 경우 별도로 요청하지 않는 한 중국어로 응답합니다.
 
@@ -149,25 +147,24 @@ Rendered file: [link] [only if generated]
 
 | 도구| 자동으로 설치 가능| 설치방법| 설명|
 |------|-----------|---------|------|
-| Mermaid CLI (mmdc) | ✓ | npm install -g @mermaid-js/mermaid-cli | Mermaid를 PNG/SVG로 렌더링 |
+| Mermaid CLI (mmdc) | ✗ | `npm install -g @mermaid-js/mermaid-cli` | Mermaid를 PNG/SVG로 렌더링 |
 | Graphviz (dot) | ✗ | 수동 설치 | https://graphviz.org/download/ |
 | PlantUML | ✗ | Java + plantuml.jar 필요 | https://plantuml.com/download |
-| Python(렌더링 스크립트) | ✓ | 이미 부트스트랩에 있음| `scripts/render_diagram.py` 의존성 |
 
 ### 설명
 
 이 스킬은 주로 텍스트 형식의 다이어그램 소스(Mermaid/DOT/PlantUML)를 출력하므로 로컬 렌더링 도구가 항상 필요한 것은 아닙니다. 사용자가 PNG/SVG/PDF 파일 생성을 명시적으로 요청한 경우에만 해당 렌더러가 필요합니다.
 
-렌더러를 사용할 수 없는 경우 `scripts/render_diagram.py`는 오류를 보고하는 대신 설치 프롬프트를 출력합니다.
+현재 큐레이션에는 자동 설치 기능이 없습니다. 렌더러를 사용할 수 없으면 소스만 반환하고 필요한 공식 설치 방법을 안내합니다.
 
 ---
 
 ## 라우팅 컨텍스트
 
-**상류 입구**: `../../SKILL.md`(마스터 제어), `routing.md`
+**상류 입구**: `../../SKILL.md`(마스터 제어), `../../routing.md`
 **트리거 조건**: 사용자가 "도면 다이어그램", "플로우 차트", "아키텍처 다이어그램", "공격 경로 다이어그램", "시퀀스 다이어그램", "Mermaid", "Graphviz", "PlantUML"라고 말합니다.
 **다운스트림 내보내기**:
-- 생성된 차트는 `docs-generator/` 보고서에 포함될 수 있습니다.
-- 공격 경로 지도는 `pentest-tools/`의 침투 보고서와 함께 사용할 수 있습니다.
+- 생성된 차트는 `../docs-generator/` 보고서에 포함될 수 있습니다.
+- 공격 경로 지도는 보안 보고서의 증거 시각화로 사용할 수 있습니다.
 
-**유사 연결 모듈**: `docs-generator/`(보고서에 삽입된 차트)
+**유사 연결 모듈**: `../docs-generator/`(보고서에 삽입된 차트)

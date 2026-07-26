@@ -41,9 +41,9 @@ Java.perform(function() {
 
 ```javascript
 // Hook Export function
-Interceptor.attach(Module.findExportByName(null, "open"), {
+Interceptor.attach(Module.findGlobalExportByName("open"), {
     onEnter: function(args) {
-        this.path = Memory.readUtf8String(args[0]);
+        this.path = args[0].readUtf8String();
     },
     onLeave: function(retval) {
         console.log("open(" + this.path + ") = " + retval);
@@ -51,7 +51,7 @@ Interceptor.attach(Module.findExportByName(null, "open"), {
 });
 
 // Hook Any address (via offset)
-var base = Module.findBaseAddress("libnative.so");
+var base = Process.getModuleByName("libnative.so").base;
 var target = base.add(0x12345);
 Interceptor.attach(target, {
     onEnter: function(args) {
@@ -61,7 +61,7 @@ Interceptor.attach(target, {
 });
 
 // Modify return value
-Interceptor.attach(Module.findExportByName(null, "strcmp"), {
+Interceptor.attach(Module.findGlobalExportByName("strcmp"), {
     onLeave: function(retval) {
         if (retval.toInt32() === 0) return; // strings equal, skip
         // Force match
@@ -96,9 +96,8 @@ var str = NSString.stringWithString_("Hello from Frida");
 
 ### 유니버설
 
-```bash
-objection -g "com.app" explore           # 시작
-objection -g "com.app" explore -q        # 자동 시작(기다리지 않고 주입만 가능)
+```text
+objection -n "com.app" start             # 시작
 objection patchapk --source app.apk      # Frida 가젯 자동 삽입
 objection signapk --source app.apk       # Signature only
 
@@ -181,38 +180,44 @@ codesign -f -s "Apple Development" Payload/App.app
 
 ## SSL 고정 우회 고급
 
-### 다중 계층 우회(Android)
+### Android 검증 지점 예시(대상별 검증 필요)
 
 ```javascript
-// 1. OkHttp CertificatePinner
-var CertificatePinner = Java.use("okhttp3.CertificatePinner");
-CertificatePinner.check.overload('java.lang.String', 'java.util.List').implementation = function() {};
+Java.perform(function() {
+    // 1. OkHttp CertificatePinner
+    var CertificatePinner = Java.use("okhttp3.CertificatePinner");
+    CertificatePinner.check.overload('java.lang.String', 'java.util.List').implementation = function() {};
 
-// 2. TrustManager 사용자 정의
-var TrustManagerImpl = Java.use("com.android.org.conscrypt.TrustManagerImpl");
-TrustManagerImpl.verifyChain.implementation = function() { return []; };
+    // 2. TrustManager 사용자 정의
+    var TrustManagerImpl = Java.use("com.android.org.conscrypt.TrustManagerImpl");
+    TrustManagerImpl.verifyChain.implementation = function(untrustedChain) { return untrustedChain; };
 
-// 3. WebView SSL Error
-var SslErrorHandler = Java.use("android.webkit.SslErrorHandler");
-SslErrorHandler.proceed.implementation = function() { return this.proceed(); };
-
-// 4. Network Security Config
-// AndroidManifest.xml 수정 필요 → android:networkSecurityConfig="@xml/network_security_config"
-// XML에 신뢰할 수 있는 사용자 인증서 추가
+    // 3. WebView SSL 오류를 처리하는 앱의 실제 WebViewClient 하위 클래스로 교체
+    var TargetWebViewClient = Java.use("com.example.TargetWebViewClient");
+    TargetWebViewClient.onReceivedSslError.overload(
+        'android.webkit.WebView',
+        'android.webkit.SslErrorHandler',
+        'android.net.http.SslError'
+    ).implementation = function(view, handler) {
+        handler.proceed();
+    };
+});
 ```
+
+`SslErrorHandler.proceed()` 자체를 후크해 다시 호출하는 것은 검증 경로를 바꾸지 않는 no-op입니다. 위 클래스명·OkHttp 오버로드·TrustManager 반환 형식은 앱과 라이브러리 버전에서 확인하고 필요한 지점만 계측하세요. Network Security Configuration은 재패키징 가능한 승인된 테스트 빌드에서 별도로 검토합니다.
 
 ### 다중 계층 우회(iOS)
 
 ```javascript
 // 1. NSURLSession
-var SecTrustEvaluate = Module.findExportByName("Security", "SecTrustEvaluate");
+var SecTrustEvaluate = Module.findGlobalExportByName("SecTrustEvaluate");
 Interceptor.replace(SecTrustEvaluate, new NativeCallback(function(trust, result) {
-    Memory.writeU32(result, 1); // kSecTrustResultProceed = 1
+    result.writeU32(1); // kSecTrustResultProceed = 1
     return 0; // errSecSuccess
 }, 'int', ['pointer', 'pointer']));
 
 // 2. Alamofire
-// Hook ServerTrustManager.evaluate → 항상 성공을 반환합니다.
+// 대상 Alamofire 버전의 ServerTrustManager.evaluate 성공 경로를 확인한 뒤 계측
 ```
 
-Source: Frida 문서, Objection 위키, OWASP MSTG
+Source: Frida 문서, Objection wiki, OWASP MASTG

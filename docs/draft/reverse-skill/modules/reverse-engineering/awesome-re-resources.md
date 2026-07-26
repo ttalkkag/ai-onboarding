@@ -50,7 +50,6 @@
 |**Detect It Easy (DiE)**| 파일 유형/패커/컴파일러 식별| https://github.com/horsicq/Detect-It-Easy |
 | **PE-bear** | PE 파일 분석기| https://github.com/hasherezade/pe-bear |
 | **Capa** | 바이너리 기능(네트워크/파일/암호화 등)을 자동으로 식별합니다.| https://github.com/mandiant/capa |
-| **Unpacker** | 범용 언패킹 프레임워크| https://github.com/malwaretech/UnpackerFramework |
 
 ---
 
@@ -102,7 +101,7 @@
 
 1. [Reverse Engineering for Beginners](https://beginners.re/) — 무료 전자책
 2. [Azeria Labs ARM Tutorial](https://azeria-labs.com/) — ARM 어셈블리 기초
-3. [악몽](https://guyinatuxedo.github.io/) — CTF 리버스/폰 튜토리얼
+3. [Nightmare](https://guyinatuxedo.github.io/) — CTF 리버스/pwn 튜토리얼
 4. [crackmes.one](https://crackmes.one/) — 리버싱 연습
 
 ### 고급(3~12개월)
@@ -116,8 +115,8 @@
 
 1. [현대 바이너리 활용](https://github.com/RPISEC/MBE) — RPI 과정
 2. [유령처럼 해킹하는 방법](https://nostarch.com/how-hack-ghost) — 고급 침투
-3. [Windows 내부](https://docs.microsoft.com/en-us/sysinternals/) — Windows 커널
-4. 실제 전투: 실제 악성코드 샘플 분석(MalwareBazaar)
+3. [Microsoft Sysinternals 문서](https://learn.microsoft.com/en-us/sysinternals/) — Windows 진단·관리 도구
+4. 실제 악성코드 샘플 분석(MalwareBazaar) — 명시적 권한이 있는 격리 실습 환경에서만 다운로드하고, 호스트·개인 계정·공유 네트워크와 분리
 
 ---
 

@@ -10,7 +10,7 @@
 
 ```text
 1. APK에서.so 파일을 추출합니다.
-   unzip app.apk lib/arm64-v8a/*.so -d extracted/
+   unzip app.apk 'lib/arm64-v8a/*.so' -d extracted/
 
 2. 아키텍처 및 기본정보 확인
    file libxxx.so
@@ -64,7 +64,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
    이런 식으로 env->FindClass / env->GetMethodID 등의 호출이 자동으로 인식됩니다.
 
 3. RegisterNatives 찾기
-   JNIEnv vtable 오프셋 0x35C(ARM64)에 대한 호출 검색
+   대상 ABI와 JNI 헤더의 `JNINativeInterface` 레이아웃을 기준으로 호출 슬롯을 식별
    → 세 번째 매개변수는 JNINativeMethod 배열입니다.
    → 배열에서 모든 네이티브 함수 주소를 추출합니다.
 ```
@@ -77,7 +77,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 
 ```javascript
 // Hook libc 함수
-Interceptor.attach(Module.findExportByName("libc.so", "open"), {
+Interceptor.attach(Process.getModuleByName("libc.so").findExportByName("open"), {
     onEnter: function(args) {
         this.path = args[0].readUtf8String();
         console.log("[open] " + this.path);
@@ -91,7 +91,7 @@ Interceptor.attach(Module.findExportByName("libc.so", "open"), {
 });
 
 // Hook SO에서 기능 맞춤설정
-var base = Module.findBaseAddress("libsecurity.so");
+var base = Process.getModuleByName("libsecurity.so").base;
 var targetFunc = base.add(0x1234);  // 오프셋 주소
 Interceptor.attach(targetFunc, {
     onEnter: function(args) {
@@ -139,13 +139,14 @@ Process.enumerateModules().forEach(function(module) {
         Memory.scan(module.base, module.size, "48 65 6C 6C 6F", {  // "Hello"
             onMatch: function(address, size) {
                 console.log("Found at: " + address);
-            }
+            },
+            onComplete: function() {}
         });
     }
 });
 
 // 메모리 수정(패치 명령)
-var addr = Module.findBaseAddress("libsecurity.so").add(0x5678);
+var addr = Process.getModuleByName("libsecurity.so").base.add(0x5678);
 Memory.patchCode(addr, 4, function(code) {
     var writer = new Arm64Writer(code, {pc: addr});
     writer.putNop();  // NOP로 교체
@@ -157,10 +158,10 @@ Memory.patchCode(addr, 4, function(code) {
 
 ## SSL 고정 우회
 
-### 일반 솔루션(권장)
+### 출발점 예시(구현별 검증 필요)
 
 ```javascript
-// Frida 범용 SSL 고정 우회
+// 일반적인 Java TLS 검증 지점 예시
 // 출처: https://github.com/0xCD4/SSL-bypass
 Java.perform(function() {
     // 1. TrustManager 우회
@@ -187,6 +188,8 @@ Java.perform(function() {
 });
 ```
 
+이 코드는 출발점 예시입니다. 새로 초기화한 `SSLContext`가 앱의 기존 연결에 자동 적용되는 것은 아니며, OkHttp 오버로드·커스텀 TrustManager·네이티브 TLS는 앱과 라이브러리 버전에 맞춰 각각 확인해야 합니다.
+
 ### 각 프레임은 우회합니다.
 
 | 프레임| 바이패스 방식|
@@ -202,17 +205,21 @@ Java.perform(function() {
 
 ```javascript
 // Flutter SSL 고정 우회(ssl_verify_peer_cert 함수를 찾아야 함)
-var flutter_lib = Module.findBaseAddress("libflutter.so");
+var flutterModule = Process.getModuleByName("libflutter.so");
+var flutter_lib = flutterModule.base;
 // ssl_verify_peer_cert의 서명을 검색하세요.
 var pattern = "FF 03 05 D1 FD 7B 0F A9";  // ARM64 기능
-Memory.scan(flutter_lib, Module.findModuleByName("libflutter.so").size, pattern, {
+Memory.scan(flutter_lib, flutterModule.size, pattern, {
     onMatch: function(address) {
         Interceptor.replace(address, new NativeCallback(function() {
             return 0;  // 반환 성공
         }, 'int', []));
-    }
+    },
+    onComplete: function() {}
 });
 ```
+
+위 바이트열은 특정 빌드의 예시일 뿐 안정적인 함수 식별자가 아닙니다. 대상 `libflutter.so` 버전과 아키텍처에서 디스어셈블리·호출 관계로 검증한 주소만 계측하세요.
 
 ---
 
@@ -225,21 +232,21 @@ Memory.scan(flutter_lib, Module.findModuleByName("libflutter.so").size, pattern,
 | 확인 `/system/app/Superuser.apk`|후크 `File.exists()`는 false를 반환합니다.|
 | `su` 명령을 확인하세요| 후크 `Runtime.exec()`는 su 호출을 가로챕니다.|
 | 확인 `/proc/self/mounts`| Hook 파일 읽기, magisk 필터링 관련|
-| SafetyNet/Play 정직성| Magisk Hide / Zygisk + 샤미코|
+| Play Integrity API | 승인된 테스트 빌드에서 서버 판정과 오류 처리 검증(SafetyNet Attestation은 종료됨) |
 | Magisk 패키지 이름 확인| Magisk 패키지 이름 무작위화|
 | 확인 `/data/adb/`| 후크 `opendir`/`access`|
 
-### Frida 범용 루트 우회
+### Frida 루트 탐지 우회 출발점
 
 ```javascript
 Java.perform(function() {
     // Hook File.exists
     var File = Java.use("java.io.File");
     File.exists.implementation = function() {
-        var path = this.getAbsolutePath();
-        var blacklist = ["su", "Superuser", "magisk", "busybox", "xposed"];
+        var name = this.getName().toString().toLowerCase();
+        var blacklist = ["su", "superuser.apk", "magisk", "busybox", "xposed"];
         for (var i = 0; i < blacklist.length; i++) {
-            if (path.toLowerCase().includes(blacklist[i])) {
+            if (name === blacklist[i]) {
                 return false;
             }
         }
@@ -249,9 +256,8 @@ Java.perform(function() {
     // Hook System.getProperty
     var System = Java.use("java.lang.System");
     System.getProperty.overload('java.lang.String').implementation = function(key) {
-        if (key === "ro.debuggable" || key === "ro.secure") {
-            return "1";
-        }
+        if (key === "ro.debuggable") return "0";
+        if (key === "ro.secure") return "1";
         return this.getProperty(key);
     };
 });
@@ -293,22 +299,20 @@ Java.perform(function() {
 - dex 메모리 영역을 읽어서 저장
 ```
 
-### Frida DEX 덤프 스크립트
+### ClassLoader 열거 예시(DEX 덤프 아님)
 
 ```javascript
 Java.perform(function() {
     Java.enumerateClassLoaders({
         onMatch: function(loader) {
-            try {
-                var dexFiles = loader.getDexFileList();
-                console.log("ClassLoader: " + loader);
-                console.log("  DEX files: " + dexFiles);
-            } catch(e) {}
+            console.log("ClassLoader: " + loader);
         },
         onComplete: function() {}
     });
 });
 ```
+
+표준 ClassLoader에는 `getDexFileList()` API가 없습니다. 실제 DEX 메모리 덤프는 대상 런타임 버전에 맞는 ART 네이티브 후크나 검증된 전용 도구를 별도로 사용해야 합니다.
 
 ---
 
@@ -341,8 +345,8 @@ Java.perform(function() {
 
 | 도구| 목적| 설치|
 |------|------|------|
-| jadx | 자바 디컴파일| 이미 부트스트랩에 있음|
-| apktool | 포장 풀기/재포장| 이미 부트스트랩에 있음|
+| jadx | 자바 디컴파일| 현재 큐레이션에 미포함; 실행 전 확인|
+| apktool | 포장 풀기/재포장| 현재 큐레이션에 미포함; 실행 전 확인|
 | Frida | 다이나믹 훅| `pip install frida-tools` |
 | Objection | Frida 캡슐화(사용하기 더 쉬움)| `pip install objection` |
 | MobSF | 자동화된 모바일 보안 분석| 도커 배포|
@@ -359,7 +363,7 @@ Java.perform(function() {
 | 자원| 설명| 링크|
 |------|------|------|
 | OWASP MASTG | 모바일 보안 테스트 가이드| https://mas.owasp.org/ |
-| FridaBypassKit | 범용 우회 프레임워크| https://github.com/okankurtuluss/FridaBypassKit |
-| SSL-bypass | 범용 SSL 고정 우회| https://github.com/0xCD4/SSL-bypass |
+| FridaBypassKit | 다층 우회 예제 모음(대상별 검증 필요)| https://github.com/okankurtuluss/FridaBypassKit |
+| SSL-bypass | SSL 고정 우회 예제(구현별 검증 필요)| https://github.com/0xCD4/SSL-bypass |
 | awesome-frida | Frida 자원 수집| https://github.com/dweinstein/awesome-frida |
 | 안드로이드 보안이 훌륭해요| Android 보안 리소스| https://github.com/ashishb/android-security-awesome |

@@ -56,7 +56,7 @@ r2 -w sample.exe
 s 0x401000
 wa nop
 wx 9090
-wq
+q
 ```
 
 ## 비대화형 모드

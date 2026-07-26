@@ -1,34 +1,35 @@
 # CTF Reverse - 컴파일된 언어 반전(Go, Rust)
 
 ## 목차
-- [이진 반전 이동](#go-binary-reversing)
+- [Go 바이너리 리버싱](#go-바이너리-리버싱)
   - [Recognition](#recognition)
-  - [기호 복구](#symbol-recovery)
-  - [고 메모리 레이아웃](#go-memory-layout)
-  - [고루틴 및 동시성 분석](#goroutine-and-concurrency-analytic)
-  - [디컴파일의 일반적인 Go 패턴](#common-go-patterns-in-decompilation)
-  - [Go Binary 반전 작업 흐름](#go-binary-reversing-workflow)
-  - [C2 클라이언트 열거를 위한 Go 바이너리 UUID 패치(BSidesSF 2026)](#go-binary-uuid-patching-for-c2-client-enumeration-bsidessf-2026)
-- [Rust 바이너리 반전](#rust-binary-reversing)
-  - [녹 인식](#rust-recognition)
-  - [심볼 디맹글링](#symbol-demangling)
-  - [디컴파일의 일반적인 Rust 패턴](#common-rust-patterns-in-decompilation)
-  - [Rust 관련 분석 도구](#rust-특정-분석 도구)
-- [Swift 바이너리 역전](#swift-binary-reversing)
-- [Kotlin / JVM 바이너리 역전](#kotlin--jvm-binary-reversing)
-  - [JVM 바이트코드(Android/Server)](#jvm-bytecode-androidserver)
+  - [Symbol Recovery](#symbol-recovery)
+  - [Go 메모리 레이아웃](#go-메모리-레이아웃)
+  - [고루틴 및 동시성 분석](#고루틴-및-동시성-분석)
+  - [디컴파일의 일반적인 Go 패턴](#디컴파일의-일반적인-go-패턴)
+  - [Go Binary 역전 작업 흐름](#go-binary-역전-작업-흐름)
+  - [C2 클라이언트 열거를 위한 Go 바이너리 UUID 패치(BSidesSF 2026)](#c2-클라이언트-열거를-위한-go-바이너리-uuid-패치bsidessf-2026)
+- [Rust 바이너리 반전](#rust-바이너리-반전)
+  - [Rust Recognition](#rust-recognition)
+  - [Symbol Demangling](#symbol-demangling)
+  - [디컴파일 시 일반적인 Rust 패턴](#디컴파일-시-일반적인-rust-패턴)
+  - [Rust 관련 분석 도구](#rust-관련-분석-도구)
+- [Swift 바이너리 리버싱](#swift-바이너리-리버싱)
+- [Kotlin/JVM 바이너리 반전](#kotlinjvm-바이너리-반전)
+  - [JVM 바이트코드(Android/Server)](#jvm-바이트코드androidserver)
   - [Kotlin/Native](#kotlinnative)
-- [D 언어 바이너리 역전(CSAW CTF 2016)](#d-언어-binary-reversing-csaw-ctf-2016)
-- [STG 클로저 및 hsdecomp를 통한 Haskell 바이너리 역전(hxp CTF 2017, Codegate 2018)](#haskell-binary-reversing-via-stg-closures-and-hsdecomp-hxp-ctf-2017-codegate-2018)
-- [GHC CMM 중급 언어를 통한 Haskell 바이너리 RE(N1CTF 2018)](#haskell-binary-re-via-ghc-cmm-intermediate-언어-n1ctf-2018)
-- [C++ 이진 반전(빠른 참조)](#c-binary-reversing-quick-reference)
-  - [vtable 재구성](#vtable-reconstruction)
-  - [RTTI(런타임 유형 정보)](#rtti-run-time-type-information)
-  - [표준 라이브러리 패턴](#standard-library-patterns)
+- [D 언어 바이너리 역전(CSAW CTF 2016)](#d-언어-바이너리-역전csaw-ctf-2016)
+- [Haskell 바이너리 리버싱](#haskell-바이너리-리버싱)
+  - [STG 클로저 및 hsdecomp(hxp CTF 2017, Codegate 2018)](#stg-클로저-및-hsdecomphxp-ctf-2017-codegate-2018)
+  - [GHC CMM 중간 언어(N1CTF 2018)](#ghc-cmm-중간-언어n1ctf-2018)
+- [C++ 이진 반전(빠른 참조)](#c-이진-반전빠른-참조)
+  - [vtable Reconstruction](#vtable-reconstruction)
+  - [RTTI(런타임 유형 정보)](#rtti런타임-유형-정보)
+  - [표준 라이브러리 패턴](#표준-라이브러리-패턴)
 
 ---
 
-## 이진 반전으로 이동
+## Go 바이너리 리버싱
 
 Go 바이너리는 CLI 도구, 네트워크 서비스 및 악성 코드에 대한 Go의 인기로 인해 CTF 과제에서 점점 더 보편화되고 있습니다.
 
@@ -73,17 +74,17 @@ for fn in data.get('UserFunctions', []):
 **Ghidra golang-loader 사용:**
 ```bash
 # Install: Ghidra → Window → Script Manager → search "golang"
-# Or use: https://github.com/getCUJO/ThreatFox/tree/main/ghidra-golang
-# Recovers function names, string references, interface tables
+# Or import GoReSym JSON with its maintained Ghidra integration:
+# https://github.com/mandiant/GoReSym/tree/master/GhidraPython
 ```
 
 **수정(이진 분석 이동):**
 ```bash
 # https://github.com/goretk/redress
-redress -src binary         # Reconstruct source tree
-redress -pkg binary         # List packages
-redress -type binary        # List types and methods
-redress -interface binary   # List interfaces
+redress source binary              # Reconstruct source tree
+redress packages binary            # List packages
+redress types all binary           # List all types
+redress types interface binary     # List interfaces
 ```
 
 ### Go 메모리 레이아웃
@@ -91,35 +92,35 @@ redress -interface binary   # List interfaces
 디컴파일 시 Go의 데이터 구조 이해하기:
 
 ```c
-# String: {pointer, length} (16 bytes on 64-bit)
-# NOT null-terminated! Length field is critical.
+// String: {pointer, length} (16 bytes on 64-bit)
+// NOT null-terminated! Length field is critical.
 struct GoString {
     char *ptr;    // pointer to UTF-8 data
     int64 len;    // byte length
 };
 
-# Slice: {pointer, length, capacity} (24 bytes on 64-bit)
+// Slice: {pointer, length, capacity} (24 bytes on 64-bit)
 struct GoSlice {
     void *ptr;    // pointer to backing array
     int64 len;    // current length
     int64 cap;    // allocated capacity
 };
 
-# Interface: {type_descriptor, data_pointer} (16 bytes)
+// Interface: {type_descriptor, data_pointer} (16 bytes)
 struct GoInterface {
     void *type;   // points to type metadata (itab for non-empty interface)
     void *data;   // points to actual value
 };
 
-# Map: pointer to runtime.hmap struct
-# Channel: pointer to runtime.hchan struct
+// Map: pointer to runtime.hmap struct
+// Channel: pointer to runtime.hchan struct
 ```
 
 **Ghidra/IDA:** `(ptr, int64)`을 사용하는 함수를 보면 — Go 문자열일 가능성이 높습니다. 3필드 `(ptr, int64, int64)`는 슬라이스입니다.
 
 ### 고루틴 및 동시성 분석
 
-```bash
+```text
 # Identify goroutine spawns in disassembly
 strings binary | grep "runtime.newproc"
 # newproc1 is the internal goroutine creation function
@@ -147,9 +148,9 @@ gdb ./binary
 **오류 처리(`if err != nil` 패턴):**
 ```text
 # In disassembly, this appears as:
-# call some_function        → returns (result, error) as two values
-# test rax, rax             → check if error (second return value) is nil
-# jne error_handler
+# call some_function        → may return multiple values in registers/stack
+# The exact register(s) holding an `error` interface depend on result types,
+# architecture, and Go's ABI generation; recover the signature before testing.
 ```
 
 **String concatenation:**
@@ -171,7 +172,7 @@ gdb ./binary
 
 ### Go Binary 역전 작업 흐름
 
-```bash
+```text
 1. file binary                          # Confirm Go, get arch
 2. GoReSym -d binary > syms.json       # Recover symbols
 3. strings binary | grep -i flag        # Quick win check
@@ -190,7 +191,7 @@ strings binary | grep "embed"
 # Search for known file signatures (PK for zip, PNG header, etc.)
 ```
 
-**주요 통찰력:** Go의 런타임은 제거된 바이너리에도 광범위한 메타데이터를 포함합니다. 수동 분석 전에 GoReSym을 사용하세요. 종종 함수 이름의 90% 이상을 복구하므로 디컴파일이 훨씬 쉬워집니다. Go 문자열은 null로 끝나지 않은 `{ptr, len}` 튜플입니다. Ghidra의 기본 문자열 분석에서는 golang-loader 플러그인이 없으면 해당 문자열이 누락됩니다.
+**주요 통찰력:** Go의 런타임은 제거된 바이너리에도 광범위한 메타데이터를 포함합니다. 수동 분석 전에 GoReSym을 사용하면 대상 버전과 손상 정도에 따라 많은 함수 이름을 복구할 수 있습니다. Go 문자열은 null로 끝나지 않은 `{ptr, len}` 튜플입니다. Ghidra의 기본 문자열 분석에서는 golang-loader 플러그인이 없으면 해당 문자열이 누락될 수 있습니다.
 
 **탐지:** 대규모 정적 바이너리(간단한 프로그램의 경우 2MB 이상), `go.buildid`, `runtime.gopanic`, `/home/user/go/src/`와 같은 소스 경로.
 
@@ -199,6 +200,8 @@ strings binary | grep "embed"
 **패턴(2번 참조):** Go로 컴파일된 C2 클라이언트에는 `-ldflags -X`을 통해 내장된 UUID가 있습니다. C2 서버는 인증을 위해 mTLS를 사용합니다. 다른 클라이언트와 해당 파일을 열거하려면 UUID를 패치하여 새 클라이언트로 등록한 다음 C2 API를 사용하여 모든 클라이언트를 나열하고 추출된 파일을 다운로드합니다.
 
 **Approach:**
+이 사례 절차는 소유하거나 명시적으로 허가받은 CTF 인프라의 격리된 환경에서만 수행합니다.
+
 1. Go 빌드 메타데이터에서 포함된 UUID 추출: `go version -m client_binary`
 2. UUID 바이너리 패치(간단한 바이트 교체 — Go 문자열에는 고정 길이 지원 배열이 있음)
 3. 패치된 바이너리를 사용하여 C2 서버에 등록합니다(mTLS 인증서가 내장되어 있거나 distfile에 있음).
@@ -217,14 +220,16 @@ import sys
 data = open('client_binary', 'rb').read()
 old_uuid = b'original-uuid-value-here'
 new_uuid = b'attacker-uuid-value-here'
-patched = data.replace(old_uuid, new_uuid)
+assert len(old_uuid) == len(new_uuid), "replacement must preserve length"
+assert data.count(old_uuid) == 1, "expected exactly one verified UUID occurrence"
+patched = data.replace(old_uuid, new_uuid, 1)
 open('client_patched', 'wb').write(patched)
 "
 chmod +x client_patched
 ./client_patched --register
 ```
 
-**주요 통찰력:** Go 바이너리는 `-ldflags -X`의 문자열 값을 바이너리 데이터 섹션에 직접 삽입합니다. Go 문자열은 지원 바이트 배열을 가리키는 `{ptr, len}` 쌍이므로 UUID 바이트(동일한 길이)를 바꾸면 유효한 패치 바이너리가 생성됩니다. mTLS 인증서는 클라이언트를 서버에 인증하지만 특정 UUID에 바인딩하지 않습니다.
+**주요 통찰력:** Go 바이너리는 `-ldflags -X`의 문자열 값을 바이너리 데이터 섹션에 직접 삽입할 수 있습니다. Go 문자열은 지원 바이트 배열을 가리키는 `{ptr, len}` 쌍이므로, 이 사례에서는 정확히 한 번 나타나는 UUID를 같은 길이로 바꿨습니다. mTLS 인증서가 UUID에 바인딩되지 않았다는 관찰은 이 사례의 서버 구현에 한정되며 일반 규칙이 아닙니다.
 
 **참조:** BSidesSF 2026 "see-two"
 
@@ -246,7 +251,7 @@ strings binary | grep "core::panicking"   # Panic infrastructure
 
 **Key indicators:**
 - `core::panicking::panic` 문자열
-- `_ZN`(Itanium ABI)로 시작하는 잘못된 기호(예: `_ZN4main4main17h...`)
+- Rust legacy mangling의 `_ZN...` 또는 v0 mangling의 `_R...` 기호(legacy 형식은 Itanium풍으로 보이지만 별도 Rust 형식)
 - ELF의 `.rustc` 섹션
 - `/rustc/<commit_hash>/library/`에 대한 언급
 - 큰 바이너리 크기(Rust는 기본적으로 정적으로 링크됨)
@@ -254,24 +259,26 @@ strings binary | grep "core::panicking"   # Panic infrastructure
 ### Symbol Demangling
 
 ```bash
-# Rust uses Itanium ABI mangling (same as C++)
+# Rust uses its own legacy (`_ZN...`) and v0 (`_R...`) mangling schemes;
+# these are not the C++ Itanium ABI even when legacy names look similar.
 # rustfilt demangles Rust-specific symbols
 cargo install rustfilt
 nm binary | rustfilt | grep "main"
 
-# Or use c++filt (works for most Rust symbols)
+# c++filt may decode some legacy-looking names, but rustfilt also supports Rust v0
 nm binary | c++filt | grep "main"
 
 # In Ghidra: Window → Script Manager → search "Demangler"
 # Enable "DemangleAllScript" for automatic demangling
 ```
 
-### 디컴파일 시 일반적인 녹 패턴
+### 디컴파일 시 일반적인 Rust 패턴
 
 **Option/Result 열거형:**
 ```text
-# Option<T> in memory: {discriminant (0=None, 1=Some), value}
-# Result<T, E>: {discriminant (0=Ok, 1=Err), union{ok_val, err_val}}
+# Do not assume a fixed layout: Rust's default representation may use an
+# explicit discriminant or a niche value (for example, null for Option<&T>).
+# Confirm the concrete type and compiler output before assigning variants.
 
 # In disassembly:
 # cmp byte [rbp-0x10], 0    → check if None/Err
@@ -280,6 +287,7 @@ nm binary | c++filt | grep "main"
 
 **Vec<T> (Go 슬라이스와 동일):**
 ```c
+// Common compiler output, not a stable Rust ABI; verify field offsets.
 struct RustVec {
     void *ptr;      // heap pointer
     uint64 cap;     // capacity
@@ -289,7 +297,7 @@ struct RustVec {
 
 **문자열 / &str:**
 ```text
-# String (owned): {ptr, capacity, length} — 24 bytes, heap-allocated
+# String (owned): often three machine words, but field order is not a stable ABI
 # &str (borrowed): {ptr, length} — 16 bytes, can point anywhere
 
 # In decompilation, look for:
@@ -319,8 +327,8 @@ strings binary | grep "called .unwrap().. on"
 cargo install cargo-bloat
 cargo bloat --release -n 50
 
-# Ghidra Rust helper scripts
-# https://github.com/AmateursCTF/ghidra-rust (community scripts for Rust RE)
+# Ghidra's current analyzer plus rustfilt for symbol demangling:
+# https://github.com/luser/rustfilt
 ```
 
 **주요 통찰력:** Rust 패닉 메시지는 금광입니다. 여기에는 릴리스 빌드에서도 소스 파일 경로, 줄 번호 및 설명 오류 문자열이 포함됩니다. 항상 `strings binary | grep "panicked"` 먼저. Rust의 단일화는 일반 함수가 유형별로 중복된다는 것을 의미합니다. 유사해 보이는 함수가 많이 있을 것으로 예상됩니다.
@@ -329,9 +337,9 @@ cargo bloat --release -n 50
 
 ---
 
-## 신속한 바이너리 역전
+## Swift 바이너리 리버싱
 
-디맹글링, 런타임 구조 및 Ghidra 통합을 포함한 전체 Swift 반전 가이드는 [platforms.md](platforms.md#swift-binary-reversing)를 참조하세요. 주요 빠른 참조:
+디맹글링, 런타임 구조 및 Ghidra 통합을 포함한 전체 Swift 반전 가이드는 [platforms.md](platforms.md#swift-바이너리-리버싱)를 참조하세요. 주요 빠른 참조:
 
 ```bash
 # Detect Swift binary
@@ -339,15 +347,15 @@ strings binary | grep "swift"
 otool -l binary | grep "swift"
 
 # Demangle Swift symbols
-swift demangle 's14MyApp0A8ClassC10checkInput6resultSbSS_tF'
+swift demangle '$s14MyApp0A8ClassC10checkInput6resultSbSS_tF'
 # → MyApp.MyAppClass.checkInput(result: String) -> Bool
 
 # Key runtime functions: swift_allocObject, swift_release, swift_once
-# String: small (≤15 bytes inline) or large (heap pointer + length)
+# String representation is an implementation detail; infer it from the target
 # Protocol witness tables = dynamic dispatch (like vtables)
 ```
 
-**탐지:** Mach-O의 `__swift5_*` 섹션, `swift_` 런타임 기호, 잘못된 이름의 `s` 접두사.
+**탐지:** Mach-O의 `__swift5_*` 섹션, `swift_` 런타임 기호, `$s` 접두사의 mangled symbol.
 
 ---
 
@@ -364,7 +372,7 @@ strings classes.dex | grep "kotlin"
 
 # Decompile
 jadx classes.dex                     # Best for Kotlin bytecode
-cfr classes.jar --kotlin             # CFR with Kotlin mode
+cfr classes.jar --outputdir output   # Java-like output; reconstruct Kotlin idioms manually
 fernflower classes.jar output/       # IntelliJ's decompiler
 
 # Kotlin-specific patterns in decompiled output:
@@ -399,7 +407,8 @@ strings binary | grep "konan"
 # Much harder to reverse — no reflection metadata
 # Uses LLVM backend, looks similar to C/C++ in disassembly
 # Key functions: InitRuntime, DeinitRuntime, CreateStablePointer
-# Memory management: automatic reference counting (not GC)
+# Modern Kotlin/Native uses a tracing garbage collector; older binaries may
+# reflect the legacy memory manager, so identify the compiler generation.
 ```
 
 **탐지:** `kotlin.Metadata` 주석(JVM), `konan` 문자열(네이티브), `kotlin/` 패키지 경로.
@@ -410,7 +419,7 @@ strings binary | grep "konan"
 
 D 언어 바이너리에는 C++와 다른 고유한 기호 맹글링이 있습니다. 컴파일 타임에 템플릿 인스턴스화는 많은 함수 변형을 생성합니다.
 
-```bash
+```python
 # Recognition: D binaries use different mangling than C++
 # Symbols contain "_D" prefix and numeric length-prefixed names
 # Example: _D4mainQaFNaNbNfZv
@@ -431,7 +440,7 @@ def reverse_d_cipher(encrypted, num_functions=500):
     """D binaries may chain multiple transformation functions.
     Each function XORs with key character, then XORs with key length.
     Process in reverse order."""
-    result = encrypted[:]
+    result = bytearray(encrypted)
     for i in range(num_functions - 1, -1, -1):
         key = str(i) * 3  # e.g., "499499499" for function enc!("499")
         key_len = len(key)
@@ -445,7 +454,9 @@ def reverse_d_cipher(encrypted, num_functions=500):
 
 ---
 
-### STG 클로저 및 hsdecomp를 통한 Haskell 바이너리 역전(hxp CTF 2017, Codegate 2018)
+## Haskell 바이너리 리버싱
+
+### STG 클로저 및 hsdecomp(hxp CTF 2017, Codegate 2018)
 
 GHC로 컴파일된 Haskell 바이너리는 STG(Spineless Tagless G-machine) 실행 모델을 사용하므로 게으른 평가, 클로저 및 썽크로 인해 되돌리기가 매우 어렵습니다. STG 머신은 모든 것을 직접 함수 호출이 아닌 클로저 호출로 전환합니다.
 
@@ -459,12 +470,13 @@ GHC로 컴파일된 Haskell 바이너리는 STG(Spineless Tagless G-machine) 실
 클로저는 첫 번째 qword가 정보를 가리키는 구조체입니다. table/code. 정보 테이블은 코드 포인터 앞에 있으며 메타데이터(클로저 유형, 레이아웃 정보, SRT)를 포함합니다.
 
 ```bash
-# Identify Haskell binary
-ldd ./binary | grep libHS
+# Identify dependencies without executing an untrusted artifact
+readelf -d ./binary | grep -E 'NEEDED.*libHS'
 readelf -s ./binary | grep hs_main
 
 # Decompile with hsdecomp (github.com/gereeter/hsdecomp)
-# Recovers closure structure and pattern matching into pseudo-Haskell
+# Historical Python 2 tool: use only in an isolated legacy environment and
+# expect compatibility gaps with newer GHC output.
 python2 hsdecomp ./binary
 
 # Compile reference for monkey-patching
@@ -490,11 +502,11 @@ main = print targetClosure  -- replace with the closure you want to evaluate
 
 ---
 
-### GHC CMM 중간 언어(N1CTF 2018)를 통한 Haskell 바이너리 RE
+### GHC CMM 중간 언어(N1CTF 2018)
 
-GHC로 컴파일된 하스켈 바이너리는 STG 실행 모델로 인해 IDA로 디컴파일하는 것이 거의 불가능합니다. `.cmm`(C-- 중간) 파일이 사용 가능하거나 복구 가능한 경우 해당 파일을 읽고 썽크, 클로저 및 지연 평가 의미를 이해하세요. 기하급수적으로 증가하는 재귀 구조의 경우 메모이제이션을 통해 세그먼트 크기를 계산하고 전체 문자열을 구체화하는 대신 이진 검색을 사용합니다.
+GHC로 컴파일된 하스켈 바이너리는 STG 실행 모델로 인해 일반 C형 디컴파일 결과를 읽기 어렵습니다. `.cmm`(C-- 중간) 파일이 사용 가능하거나 복구 가능한 경우 해당 파일을 읽고 썽크, 클로저 및 지연 평가 의미를 이해하세요. 기하급수적으로 증가하는 재귀 구조의 경우 메모이제이션을 통해 세그먼트 크기를 계산하고 전체 문자열을 구체화하는 대신 대상 인덱스가 속한 세그먼트를 재귀적으로 따라갑니다.
 
-**패턴:** 바이너리는 `f(n) = s1 + f(n-1) + s2 + f(n-1) + s3`인 재귀적 문자열 구조를 구축합니다. 직접평가는 시간적, 공간적으로 `O(2^n)`이다. 대신 메모이제이션을 사용하여 각 재귀 수준의 크기를 계산한 다음 세그먼트 경계를 따라 대상 문자 인덱스를 이진 검색합니다.
+**패턴:** 바이너리는 `f(n) = s1 + f(n-1) + s2 + f(n-1) + s3`인 재귀적 문자열 구조를 구축합니다. 직접 평가는 시간·공간 모두 `O(2^n)`입니다. 대신 메모이제이션을 사용하여 각 재귀 수준의 크기를 계산한 다음 세그먼트 경계를 따라 대상 문자 인덱스를 내려갑니다.
 
 ```python
 # Haskell recursive string: f(n) = s1 + f(n-1) + s2 + f(n-1) + s3
@@ -514,10 +526,12 @@ def char_at(n, offset):
     offset -= fsize(n-1)
     if offset < len(s2): return s2[offset]
     offset -= len(s2)
-    return char_at(n-1, offset)
+    if offset < fsize(n-1): return char_at(n-1, offset)
+    offset -= fsize(n-1)
+    return s3[offset]
 ```
 
-**주요 통찰력:** GHC의 CMM(C 마이너스 마이너스) 중간 표현은 알고리즘을 식별하기에 충분한 구조를 유지합니다. 각 수준에서 크기가 두 배로 늘어나는 재귀적 문자열 구성의 경우 기하급수적으로 증가하는 문자열을 구체화하는 대신 메모이제이션 및 대상 인덱스에 대한 이진 검색을 사용하여 세그먼트 크기를 계산합니다.
+**주요 통찰력:** GHC의 CMM(C 마이너스 마이너스) 중간 표현은 알고리즘을 식별하기에 충분한 구조를 유지합니다. 각 수준에서 크기가 두 배로 늘어나는 재귀적 문자열 구성의 경우 기하급수적으로 증가하는 문자열을 구체화하는 대신 메모이제이션으로 세그먼트 크기를 계산하고 대상 인덱스가 속한 구간을 따라 내려갑니다.
 
 **탐지:** 챌린지 배포에 `.cmm` 파일이 포함된 Haskell 바이너리(위의 인식 참조). 기하급수적으로 증가하는 문자열과 같은 데이터를 생성하는 재귀적 폐쇄 애플리케이션을 찾으십시오.
 
@@ -532,14 +546,14 @@ C++ RE는 일반 도구에서 잘 다루어지지만 다음 패턴은 CTF에만 
 ### vtable Reconstruction
 
 ```text
-# Virtual function tables (vtables):
-# First 8 bytes of object → pointer to vtable
-# vtable entries: [typeinfo_ptr, destructor, method1, method2, ...]
-# In Ghidra: Data → Create Pointer at vtable address
+# Virtual function tables are ABI-specific.
+# Itanium ABI: the object's vptr points at an address point; offset-to-top and
+# RTTI pointer are at negative indices, and non-negative entries are virtual calls.
+# MSVC uses a different complete-object-locator/vftable arrangement.
 
 # Identify polymorphic dispatch:
 # mov rax, [rdi]           # Load vtable from this pointer
-# call [rax + 0x18]        # Call 4th virtual method (0x18/8 = 3rd after typeinfo+dtor)
+# call [rax + 0x18]        # Call slot 3 relative to this address point
 ```
 
 ### RTTI(런타임 유형 정보)
@@ -556,11 +570,11 @@ c++filt _ZTI7MyClass                        # → typeinfo for MyClass
 ### 표준 라이브러리 패턴
 
 ```text
-std::string (libstdc++):
-  SSO (Small String Optimization): inline buffer for ≤15 chars
-  Layout: {char* ptr, size_t size, union{size_t cap, char buf[16]}}
+std::string (one common libstdc++ layout):
+  SSO (Small String Optimization): short strings may use an inline buffer
+  Confirm the standard-library version and field offsets in the target.
 
-std::vector<T>:
+std::vector<T> (common implementation, not a stable ABI):
   {T* begin, T* end, T* capacity_end}
 
 std::map<K,V>:

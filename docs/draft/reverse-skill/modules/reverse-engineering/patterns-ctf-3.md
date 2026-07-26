@@ -1,26 +1,26 @@
 # CTF 리버스 - 경쟁별 패턴(3부)
 
 ## 목차
-- [단일 선 Python 부울 회로용 Z3(BearCatCTF 2026)](#z3-for-single-line-python-boolean-circuit-bearcatctf-2026)
-- [슬라이딩 윈도우 팝카운트 차등 전파(BearCatCTF 2026)](#sliding-window-popcount- Differential-propagation-bearcatctf-2026)
-- [ioctl을 통한 키보드 LED의 모스 부호(PlaidCTF 2013)](#morse-code-from-keyboard-leds-via-ioctl-plaidctf-2013)
-- [C++ 소멸자 숨겨진 유효성 검사(Defcamp 2015)](#c-destructor-hidden-validation-defcamp-2015)
-- [Syscall 부작용 메모리 손상(Hack.lu 2015)](#syscall-side- effect-memory-corruption-hacklu-2015)
-- [MFC 대화 상자 이벤트 처리기 위치(WhiteHat 2015)](#mfc-dialog-event-handler-location-whitehat-2015)
-- [VM 순차 키 체인 Brute-Force(Midnight Flag 2026)](#vm-serial-key-chain-brute-force-midnight-flag-2026)
-- [터미네이터가 없는 Burrows-Wheeler 변환 반전(ASIS CTF Finals 2016)](#burrows-wheeler-transform-inversion-without-terminator-asis-ctf-finals-2016)
-- [숨겨진 메시지에 대한 OpenType 글꼴 합자 악용(Hack The Vote 2016)](#opentype-font-ligature-exploitation-for-hidden-messages-hack-the-vote-2016)
-- [자체 수정 코드가 포함된 GLSL 셰이더 VM(ApoorvCTF 2026)](#glsl-shader-vm-with-self-modifying-code-apoorvctf-2026)
-- [암호화 상태로서의 명령 카운터(MetaCTF Flash 2026)](#instruction-counter-as-cryptographic-state-metactf-flash-2026)
-- [부호 있는 정수 오버플로가 있는 스레드 경쟁 조건(Codegate 2017)](#thread-race-condition-with-signed-integer-overflow-codegate-2017)
-- [ESP32/Xtensa ROM 기호 맵을 사용한 펌웨어 반전(Insomni'hack 2017)](#esp32xtensa-firmware-reversing-with-rom-symbol-map-insomnihack-2017)
-- [objdump 패턴 추출을 통한 일괄 Crackme 자동화(DEF CON 2017)](#batch-crackme-automation-via-objdump-pattern-extraction-def-con-2017)
-- [포크 + 파이프 + 데드브랜치 안티분석(RCTF 2017)](#fork--pipe--dead-branch-anti-analysis-rctf-2017)
-- [날짜 기반 키가 있는 시간 잠금 바이너리(Hack.lu 2017)](#time-locked-binary-with-date-based-key-hacklu-2017)
-- [UnicornJS를 통한 이미지 픽셀의 ARM 코드(Hack.lu 2017)](#arm-code-in-image-pixels-via-unicornjs-hacklu-2017)
-- [x86 16비트 MBR psadbw 제약 조건 해결(CSAW 2017)](#x86-16-bit-mbr-psadbw-constraint-solving-csaw-2017)
-- [시그모이드 레이어 반전을 통한 TensorFlow DNN 반전(N1CTF 2018)](#tensorflow-dnn-inversion-by-inverting-sigmoid-layers-n1ctf-2018)
-- [x64 어셈블리에 대한 JIT 컴파일을 통한 BPF 필터 분석(Midnight Sun CTF 2018)](#bpf-filter-analytic-via-jit-compilation-to-x64-assemblies-midnight-sun-ctf-2018)
+- [단선 Python 부울 회로용 Z3(BearCatCTF 2026)](#단선-python-부울-회로용-z3bearcatctf-2026)
+- [슬라이딩 윈도우 팝카운트 차등 전파(BearCatCTF 2026)](#슬라이딩-윈도우-팝카운트-차등-전파bearcatctf-2026)
+- [ioctl을 통한 키보드 LED의 모스 부호(PlaidCTF 2013)](#ioctl을-통한-키보드-led의-모스-부호plaidctf-2013)
+- [C++ 소멸자 숨겨진 유효성 검사(Defcamp 2015)](#c-소멸자-숨겨진-유효성-검사defcamp-2015)
+- [Syscall 부작용 메모리 손상(Hack.lu 2015)](#syscall-부작용-메모리-손상hacklu-2015)
+- [MFC 대화 상자 이벤트 처리기 위치(WhiteHat 2015)](#mfc-대화-상자-이벤트-처리기-위치whitehat-2015)
+- [VM 순차 키 체인 무차별 공격(Midnight Flag 2026)](#vm-순차-키-체인-무차별-공격midnight-flag-2026)
+- [터미네이터가 없는 Burrows-Wheeler 변환 반전(ASIS CTF Finals 2016)](#터미네이터가-없는-burrows-wheeler-변환-반전asis-ctf-finals-2016)
+- [숨겨진 메시지에 대한 OpenType 글꼴 합자 활용(Hack The Vote 2016)](#숨겨진-메시지에-대한-opentype-글꼴-합자-활용hack-the-vote-2016)
+- [자체 수정 코드가 포함된 GLSL 셰이더 VM(ApoorvCTF 2026)](#자체-수정-코드가-포함된-glsl-셰이더-vmapoorvctf-2026)
+- [암호화 상태로서의 명령어 카운터(MetaCTF Flash 2026)](#암호화-상태로서의-명령어-카운터metactf-flash-2026)
+- [부호 있는 정수 오버플로가 있는 스레드 경쟁 조건(Codegate 2017)](#부호-있는-정수-오버플로가-있는-스레드-경쟁-조건codegate-2017)
+- [ESP32/Xtensa ROM 기호 맵을 사용한 펌웨어 반전(Insomni'hack 2017)](#esp32xtensa-rom-기호-맵을-사용한-펌웨어-반전insomnihack-2017)
+- [objdump 패턴 추출을 통한 일괄 Crackme 자동화(DEF CON 2017)](#objdump-패턴-추출을-통한-일괄-crackme-자동화def-con-2017)
+- [포크 + 파이프 + 데드 브랜치 방지 분석(RCTF 2017)](#포크--파이프--데드-브랜치-방지-분석rctf-2017)
+- [날짜 기반 키가 있는 시간 잠금 바이너리(Hack.lu 2017)](#날짜-기반-키가-있는-시간-잠금-바이너리hacklu-2017)
+- [UnicornJS를 통한 이미지 픽셀의 ARM 코드(Hack.lu 2017)](#unicornjs를-통한-이미지-픽셀의-arm-코드hacklu-2017)
+- [x86 16비트 MBR psadbw 제약 조건 해결(CSAW 2017)](#x86-16비트-mbr-psadbw-제약-조건-해결csaw-2017)
+- [시그모이드 레이어 반전을 통한 TensorFlow DNN 반전(N1CTF 2018)](#시그모이드-레이어-반전을-통한-tensorflow-dnn-반전n1ctf-2018)
+- [x64 어셈블리에 대한 JIT 컴파일을 통한 BPF 필터 분석(Midnight Sun CTF 2018)](#x64-어셈블리에-대한-jit-컴파일을-통한-bpf-필터-분석midnight-sun-ctf-2018)
 
 ---
 
@@ -34,24 +34,18 @@
 - 난독화된 XOR: `x ^ i` 대신 `(x | i) & ~(x & i)`
 - 입력은 하나의 큰 정수로 처리되며 비트 이동을 통해 분해됩니다.
 
-**Z3 solution:**
-```python
-from z3 import *
+**Z3 변환 골격:** 아래는 완성된 파서가 아니라, 대상 AST를 Z3 식으로 변환한 뒤 연결하는 계약입니다. 정의되지 않은 이름을 그대로 `eval`하지 말고 각 허용 AST 노드를 명시적으로 변환하세요.
 
-n_bytes = 29  # Flag length
-ari = BitVec('ari', n_bytes * 8)
+```text
+n_bytes = 29
+ari = BitVec("ari", n_bytes * 8)
+final_expr = translate_allowed_ast(source, {"ari": ari})
 
-# Parse semicolon-separated statements
-# Model walrus chains as LShR(ari, shift_amount)
-# Evaluate boolean expressions symbolically
-# Final assertion: result_var == 0
-
-s = Solver()
-s.add(bfu == 0)  # Final validation variable
-if s.check() == sat:
-    m = s.model()
-    val = m[ari].as_long()
-    flag = val.to_bytes(n_bytes, 'big').decode('ascii')
+solver = Solver()
+solver.add(final_expr == 0)
+solver.add(printable-byte constraints for every extracted byte of ari)
+assert solver.check() == sat
+flag = solver.model().eval(ari).as_long().to_bytes(n_bytes, "big")
 ```
 
 **주요 통찰력:** 단일 행 Python 난독화는 입력 비트에 대해 부울 회로를 생성합니다. 바다코끼리 연산자 체인은 단지 변수 할당일 뿐입니다. 세미콜론으로 분할하고 각각을 기호적으로 Z3으로 변환합니다. 난독화된 XOR `(a | b) & ~(a & b)`은 단지 `a ^ b`입니다. Z3는 이러한 회로를 1초 안에 해결합니다. `__builtins__` 액세스 또는 `ord()`/`chr()` 호출을 찾아 입력→정수 변환을 식별합니다.
@@ -118,7 +112,7 @@ for start_val in range(0x10000):
 # Patch ptrace call at offset with NOP (0x90)
 python3 -c "
 data = open('binary','rb').read()
-data = data[:0x72b] + b'\x90'*5 + data[:0x730]  # NOP the ptrace call
+data = data[:0x72b] + b'\x90'*5 + data[0x730:]  # NOP the ptrace call
 open('patched','wb').write(data)
 "
 
@@ -239,7 +233,6 @@ int solve_block(uint32_t old_key, uint32_t expected_key, unsigned char *out) {
     int found = 0;
     #pragma omp parallel for shared(found)
     for (int v = 0; v < 0x1000000; v++) {
-        if (found) continue;
         uint32_t input_val = ((v >> 16) << 16) | (v & 0xFF) | ((v >> 8 & 0xFF) << 8);
         uint32_t saved = input_val ^ old_key;
         uint32_t final_val = process(saved);
@@ -253,7 +246,7 @@ int solve_block(uint32_t old_key, uint32_t expected_key, unsigned char *out) {
 // Compile: gcc -O3 -march=native -fopenmp -o solve solve.c
 ```
 
-**주요 통찰력:** 변환이 의도적으로 되돌릴 수 없는 경우(반복 해시와 같은 함수) 무차별 공격이 의도된 솔루션입니다. OpenMP 병렬화는 매우 중요합니다. 287개 블록 x 1670만 개의 후보가 각각 병렬화되는 데는 몇 분이 소요되지만 단일 스레드에서는 몇 시간이 걸립니다. 순차 키 종속성은 블록을 순서대로 풀어야 하지만 각 개별 블록 검색이 당황스러울 정도로 병렬임을 의미합니다.
+**주요 통찰력:** 여기의 xorshift 단계와 홀수 상수 곱셈은 32비트에서 각각 전단사이므로 변환 자체가 비가역 해시는 아닙니다. 역연산을 유도하거나, 검색 공간이 24비트로 충분히 작다면 블록별 무차별 대입을 선택할 수 있습니다. 순차 키 종속성은 블록 순서를 고정하지만 각 블록 후보 검사는 병렬화할 수 있습니다. 위 코드에서는 `found`를 critical section 밖에서 읽지 않아 OpenMP data race를 피합니다.
 
 ---
 
@@ -306,8 +299,8 @@ def bwt_with_xor_rounds(encrypted_hex, num_rounds):
 ```python
 from fontTools.ttLib import TTFont
 
-def decode_font_ligatures(font_path, encoded_text):
-    """Extract ligature substitution table and decode message"""
+def extract_font_ligatures(font_path):
+    """Extract GSUB ligature substitutions; this does not render/decode text."""
     font = TTFont(font_path)
 
     # Extract GSUB table for ligature substitutions
@@ -328,6 +321,7 @@ def decode_font_ligatures(font_path, encoded_text):
     print("Ligature mappings found:")
     for inp, out in ligature_map.items():
         print(f"  {inp} -> {out}")
+    return ligature_map
 
     # Alternative: convert TTF to XML for manual analysis
     # font.saveXML('font_dump.xml')
@@ -345,7 +339,7 @@ def decode_font_ligatures(font_path, encoded_text):
 
 ## 자체 수정 코드가 포함된 GLSL 셰이더 VM(ApoorvCTF 2026)
 
-**패턴(Draw Me):** WebGL2 조각 셰이더는 256x256 RGBA 텍스처에서 Turing-complete VM을 구현합니다. 텍스처는 프로그램 메모리이자 디스플레이 출력입니다.
+**패턴(Draw Me):** WebGL2 조각 셰이더는 256x256 RGBA 텍스처에 상태를 저장하고 여러 프레임에 걸쳐 제한된 VM을 구현합니다. 텍스처는 프로그램 메모리이자 디스플레이 출력입니다.
 
 **Texture layout:**
 - **행 0:** 레지스터(픽셀 0 = 명령 포인터, 픽셀 1-32 = 범용)
@@ -387,7 +381,7 @@ vram = np.zeros((128, 256), dtype=np.uint8)
 Image.fromarray(vram, mode='L').save('output.png')
 ```
 
-**주요 통찰력:** GLSL 셰이더는 Turing-complete이지만 GPU 병렬 처리로 인해 쓰기 충돌이 발생합니다. 자체 수정 코드(STORE 패치)는 문제를 더욱 복잡하게 만듭니다. 즉, 병렬 실행의 패치가 서로를 덮어쓰게 됩니다. Python의 순차 에뮬레이션은 전체 출력을 복구합니다. program.png 파일은 바이트코드입니다.
+**주요 통찰력:** 이 셰이더 VM은 유한한 텍스처와 반복 프레임 안에서 상태를 전이하며, 병렬 실행 때문에 쓰기 충돌이 발생합니다. 자체 수정 코드(STORE 패치)는 병렬 패치가 서로 덮어쓰게 만들 수 있습니다. 대상의 프레임·쓰기 순서를 정확히 모델링한 순차 에뮬레이션으로 출력을 복구합니다. `program.png`는 이 사례의 바이트코드입니다.
 
 **탐지:** WebGL/shader PNG "프로그램" 파일을 사용한 챌린지, 챌린지에서 "아무 것도 렌더링되지 않습니다"라고 나오거나 출력이 깨졌습니다. GLSL 소스에서 사용자 정의 opcode 테이블을 찾으십시오.
 
@@ -485,7 +479,7 @@ def race():
 
 ## ESP32/Xtensa ROM 기호 맵을 사용한 펌웨어 반전(Insomni'hack 2017)
 
-**패턴(Internet of Fail):** 기본 IDA 지원이 없는 ESP32 펌웨어(Xtensa 아키텍처). 함수 주소를 이름에 매핑하려면 ESP32 ROM 링커 스크립트(`esp32.rom.ld`)와 함께 radare2를 사용하세요. 공용 ESP32 HTTP 서버 소스 코드를 상호 참조하여 전역 상태 변수에서 작동하는 ~20개의 조건부 XOR 함수로 구성된 비밀번호 확인 논리를 식별합니다.
+**패턴(Internet of Fail):** 이 2017 사례에서는 당시 도구의 Xtensa/ESP32 지원 제약 때문에 radare2와 ESP32 ROM 링커 스크립트(`esp32.rom.ld`)를 함께 사용했습니다. 현재 IDA/Ghidra/radare2 지원은 버전과 processor module에 따라 다르지만, 정확한 칩·ROM revision의 심볼 맵 적용은 여전히 중요합니다.
 
 ```bash
 # Load ESP32 firmware in radare2
@@ -502,7 +496,7 @@ r2 -a xtensa -b 32 firmware.bin
 # Look for URI handler registration patterns
 ```
 
-**주요 통찰력:** ESP32의 Xtensa 아키텍처에는 주류 RE 도구 지원이 부족하지만 ESP-IDF SDK는 모든 ROM 기능 주소를 해당 이름에 매핑하는 ROM 링커 스크립트를 제공합니다. radare2에서 이를 기호로 로드하면 수백 개의 함수 호출이 즉시 해결됩니다. 공개 ESP-IDF 예제 코드를 사용한 상호 참조는 제거된 펌웨어에서도 애플리케이션 수준 패턴(HTTP 핸들러, WiFi 콜백)을 식별합니다.
+**주요 통찰력:** ESP-IDF는 칩과 revision에 맞는 ROM 함수 주소를 이름에 매핑하는 linker/symbol 파일을 제공합니다. 대상과 일치하는 파일을 적용하면 제거된 펌웨어에서도 ROM 호출과 애플리케이션 수준 패턴(HTTP 핸들러, Wi-Fi 콜백)을 식별하기 쉬워집니다.
 
 ---
 
@@ -570,20 +564,13 @@ open('binary_patched','wb').write(data)
 **탐지:** 인식 가능한 날짜 범위(Unix 타임스탬프: 2012 = ~1.35B, 2017 = ~1.5B)에 속하는 큰 정수 상수에 대한 비교를 찾습니다. 문화적 중요성이 도움이 됩니다: 종말 날짜, CTF 출시 날짜, 역사적 사건.
 
 ```bash
-# Set system clock to the required date
-sudo date -s "2012-12-21 00:00:00"
-./binary
-
-# Or use faketime to avoid system-wide change
+# In a disposable VM, virtualize the process clock without changing the host
 LD_PRELOAD=/usr/lib/faketime/libfaketime.so.1 FAKETIME="2012-12-21 00:00:00" ./binary
-
-# Restore system time afterward
-sudo ntpdate pool.ntp.org
 ```
 
 **IDA/Ghidra에서:** `time()` 또는 `localtime()` 호출를 검색합니다. 살펴볼 구조체 `tm` 필드: `tm_year`(1900년 이후 연도), `tm_mon`(0 기반), `tm_mday`.
 
-**주요 정보:** 시간 기반 키는 문화적으로 중요한 날짜를 사용합니다. 항상 역방향 코드의 날짜 비교를 확인하고 더 심층적인 분석을 시도하기 전에 시스템 시계를 설정하거나 가짜 시간을 사용해 보십시오.
+**주요 정보:** 시간 기반 키는 문화적으로 중요한 날짜를 사용할 수 있습니다. 역방향 코드의 날짜 비교와 timezone을 확인하고, 호스트 시계 변경 대신 폐기 가능한 VM에서 프로세스 단위 가상 시간을 사용하세요.
 
 **참고자료:** Hack.lu CTF 2017
 
@@ -628,8 +615,8 @@ for insn in md.disasm(arm_code, 0x0):
 **`psadbw` semantics:**
 ```asm
 psadbw xmm0, xmm1
-; For each of 8 byte pairs: sum += |xmm0[i] - xmm1[i]|
-; Result stored as 16-bit integer in low qword of xmm0
+; Sum absolute byte differences independently for bytes 0..7 and 8..15.
+; The two unsigned sums are stored in the low and high 64-bit lanes of xmm0.
 ```
 
 이는 절대차의 합 방정식을 생성합니다.
@@ -646,7 +633,7 @@ from itertools import product
 # Equations are not purely linear (absolute value), but printable ASCII
 # constrains each byte to [0x20, 0x7e], limiting brute-force space
 
-def solve_psadbw_group(known_constants, expected_sum, printable_range=(0x20, 0x7e)):
+def solve_psadbw_group(known_constants, expected_sum, printable_range=(0x20, 0x7f)):
     """Brute-force 2 unknown bytes given sum-of-abs-diff constraint."""
     solutions = []
     for a, b in product(range(*printable_range), repeat=2):
@@ -674,20 +661,28 @@ def solve_psadbw_group(known_constants, expected_sum, printable_range=(0x20, 0x7
 import numpy as np
 
 def sigmoid_inv(x):
+    if np.any(x <= 0.0) or np.any(x >= 1.0):
+        raise ValueError("logit requires values strictly between 0 and 1")
     return -np.log(1.0/x - 1.0)
 
 # Invert layer by layer from output to input
 v = target_output
 for i in range(num_layers - 1, -1, -1):
-    v = np.dot(sigmoid_inv(v) - biases[i], np.linalg.inv(weights[i]))
+    rhs = sigmoid_inv(v) - biases[i]
+    if weights[i].shape[0] != weights[i].shape[1]:
+        raise ValueError("this exact inversion requires a square weight matrix")
+    if np.linalg.matrix_rank(weights[i]) != weights[i].shape[0]:
+        raise ValueError("singular layer is not uniquely invertible")
+    # Forward convention here is v_next = sigmoid(v @ W + b).
+    v = np.linalg.solve(weights[i].T, rhs)
 
 # Input was 1.0/char, so flag chars are the multiplicative inverse
 flag = ''.join(chr(int(round(1.0 / v[j]))) for j in range(len(v)))
 ```
 
-**주요 통찰력:** 가역 활성화 함수(시그모이드, tanh) 및 제곱 가중치 행렬을 갖춘 신경망은 계층별로 수학적으로 역전될 수 있습니다. 역시그모이드를 적용하고, 편향을 빼고, 가중치 역수를 곱합니다. 역시 반전되어야 하는 입력 변환(예: 1/x)을 살펴보세요.
+**주요 통찰력:** 활성값이 역함수의 정의역 안에 있고 각 가중치 행렬이 full rank이며 수치적으로 충분히 안정적일 때만 계층별 정확한 역전이 가능합니다. 역시그모이드를 적용하고 편향을 뺀 뒤 명시적 역행렬 대신 선형 시스템을 풉니다. 후보 입력은 원래 네트워크를 순방향으로 다시 실행해 오차 허용 범위 안에서 검증하세요.
 
-**탐지:** TensorFlow 또는 맞춤 DNN 구현을 사용한 바이너리입니다. `.rodata`에서 sigmoid/tanh 호출, 행렬 곱셈, 하드코딩된 부동 소수점 배열(weights/biases)을 찾아보세요. 제곱 가중치 행렬(N x N)은 네트워크가 가역적임을 나타냅니다.
+**탐지:** TensorFlow 또는 맞춤 DNN 구현을 사용한 바이너리입니다. `.rodata`에서 sigmoid/tanh 호출, 행렬 곱셈, 하드코딩된 부동 소수점 배열(weights/biases)을 찾아보세요. 제곱 행렬이라는 사실만으로 가역성을 보장하지 않으므로 rank와 condition number를 확인하세요.
 
 **References:** N1CTF 2018
 
@@ -695,20 +690,20 @@ flag = ''.join(chr(int(round(1.0 / v[j]))) for j in range(len(v)))
 
 ## x64 어셈블리에 대한 JIT 컴파일을 통한 BPF 필터 분석(Midnight Sun CTF 2018)
 
-**패턴:** 바이너리는 BPF(Berkeley Packet Filter)가 연결된 원시 소켓을 생성합니다. 표준 BPF 디스어셈블러가 읽을 수 있는 출력을 생성하지 못하는 경우 커널의 BPF JIT 컴파일러를 활성화하여 BPF 바이트코드를 기본 x64 어셈블리로 변환한 다음 dmesg에서 컴파일된 코드를 읽습니다.
+**패턴:** 바이너리는 BPF(Berkeley Packet Filter)가 연결된 원시 소켓을 생성합니다. 커널의 BPF JIT가 생성한 네이티브 코드는 현대 커널에서는 `bpftool`로 조회합니다. 과거 커널의 `bpf_jit_enable=2` dmesg 덤프 방식은 보안상 권장되지 않으며 현재 환경에서 제공되지 않을 수 있습니다.
 
 ```bash
-# Enable BPF JIT compilation
-echo 1 > /proc/sys/net/core/bpf_jit_enable
-
-# Run the binary, then read JIT-compiled BPF from kernel log
-dmesg | grep -A 100 "flen="
+# In an isolated analysis VM, enable JIT and locate the loaded program
+sudo sysctl -w net.core.bpf_jit_enable=1
+sudo bpftool prog show
+sudo bpftool prog dump jited id PROGRAM_ID
 
 # Analysis revealed: expects DNS TXT query on UDP port 3333
-dig @target -p 3333 'M4d!bKn3~l' TXT
+# Query only the owned/authorized local CTF endpoint
+dig @127.0.0.1 -p 3333 'M4d!bKn3~l' TXT
 ```
 
-**주요 통찰력:** Linux는 BPF 필터를 기본 x64 기계어 코드로 JIT 컴파일할 수 있습니다. 표준 BPF 디스어셈블러가 실패하거나 읽을 수 없는 출력을 생성하는 경우 `bpf_jit_enable`를 활성화하고 dmesg에서 컴파일된 어셈블리를 읽습니다. 네이티브 코드는 BPF 바이트코드보다 이해하기 쉬운 경우가 많습니다.
+**주요 통찰력:** Linux는 BPF 필터를 네이티브 기계어로 JIT 컴파일할 수 있습니다. 격리된 분석 VM에서 JIT를 활성화하고 `bpftool prog dump jited`로 확인하세요. 고전 cBPF가 도구에 노출되지 않으면 바이너리의 `sock_filter` 배열을 직접 추출해 사용자 공간 디스어셈블러로 분석합니다.
 
 **탐지:** `setsockopt`와 `SO_ATTACH_FILTER`, 원시 소켓 생성(`socket(AF_PACKET,...)`) 또는 내장된 `struct sock_fprog` 구조를 사용하는 바이너리. BPF 프로그램은 `struct sock_filter` 배열로 나타납니다(각각 8바이트: opcode, jt, jf, k).
 

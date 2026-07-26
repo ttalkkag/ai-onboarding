@@ -1,6 +1,6 @@
-﻿---
+---
 name: js-reverse
-description: 프론트 엔드 JavaScript 반전을 위해 js-reverse-mcp를 사용할 때 사용되며 서명 링크 위치 지정, 페이지 관찰 및 포렌식, 런타임 샘플링, 로컬 보충 환경 재생 및 증거 출력에 적합합니다. 현재 환경에서는 js-reverse_* 도구에 적응하는 것이 우선이므로 jshookmcp와의 강력한 브라우저/CDP/Hook 연결이 필요합니다.
+description: 프론트엔드 JavaScript 분석에서 서명 로직 위치 지정, 페이지 관찰·포렌식, 런타임 샘플링, 로컬 환경 재현과 증거 출력에 사용합니다. MCP를 사용하는 경우 서버가 실제로 공개한 도구 이름과 스키마를 먼저 확인합니다.
 ---
 
 # MCP 프론트엔드 JS 리버스 엔지니어링 사양
@@ -17,15 +17,15 @@ description: 프론트 엔드 JavaScript 반전을 위해 js-reverse-mcp를 사�
 
 대상이 바이너리, APK, PE, ELF, DLL, SO인 경우 대신 `ida-reverse`, `radare2` 또는 `reverse-engineering`를 사용하세요.
 
-## 현재 환경 기본 도구 매핑
+## 클라이언트별 도구 매핑
 
-이 스킬은 기본 도구 이름이 존재한다고 가정하지 않고, 현재 클라이언트 환경에서 사용 가능한 `js-reverse_*` 도구를 기본적으로 바인딩합니다.
+아래 `js-reverse_*` 이름은 이 문서가 작성될 때 사용한 클라이언트 별칭입니다. 현재 큐레이션에는 MCP 서버 구성이나 해당 이름의 도구가 포함되어 있지 않습니다. 먼저 MCP 클라이언트가 실제로 공개한 도구 목록을 확인하고, 이름과 입력 스키마가 일치할 때만 호출하세요.
 
-현재 작업에서 `jshookmcp`, `JS hook`, `CDP`, 브라우저 중단점, 네트워크 차단, SourceMap 또는 AST 난독화 해제를 명확하게 언급하는 경우에도 이 기술을 계속 사용하세요. 새로운 일반 입구로 취급하는 대신 기본 MCP를 `jshookmcp`로 자르세요.
+현재 작업에서 `jshookmcp`, `JS hook`, `CDP`, 브라우저 중단점, 네트워크 차단, SourceMap 또는 AST 난독화 해제를 언급해도 이 방법론을 사용합니다. jshookmcp가 등록·활성화되어 있다면 실제 공개된 기능을 우선 확인하고, 없으면 정적 분석과 로컬 재현 경로를 사용하세요.
 
 전제 조건: `jshookmcp`는 로컬 베어 명령 도구가 아니라 먼저 다운로드/등록/활성화해야 하는 MCP 서버입니다. Claude MCP 구성에서 액세스하고 활성화한 후에만 관련 도구 인터페이스가 실제로 호출될 수 있습니다.
 
-일반적으로 사용되는 매핑:
+레거시 매핑 참고:
 
 - `list_scripts` -> `js-reverse_list_scripts`
 - `get_script_source` -> `js-reverse_get_script_source`
@@ -152,11 +152,11 @@ description: 프론트 엔드 JavaScript 반전을 위해 js-reverse-mcp를 사�
 
 ## 라우팅 컨텍스트
 
-**상류 입구**: `../../SKILL.md`(마스터 제어), `routing.md`
+**상류 입구**: `../../SKILL.md`(마스터 제어), `../../routing.md`
 **업스트림 대안**:
 - everything-analyzer MCP(포트 23816)용 브라우저 도구를 대안으로 또는 추가로 사용할 수 있습니다.
 - jshookmcp는 더 강력한 브라우저/CDP/Hook/Network/SourceMap/AST 실행 표면 역할을 합니다.
-- `reverse-engineering/SKILL.md` (대상이 프런트엔드 JS가 아닌 경우)
+- `../reverse-engineering/methodology.md` (대상이 프런트엔드 JS가 아닌 경우)
 
 **다운스트림 내보내기**:
 - 환경보완 필요 → `references/env-patching.md`
@@ -170,28 +170,28 @@ description: 프론트 엔드 JavaScript 반전을 위해 js-reverse-mcp를 사�
 
 ## 주문형 부트스트랩
 
-이 스킬이 의존하는 MCP 기능은 통합 부트스트래핑 시스템을 통해 자동으로 등록될 수 있습니다.
+현재 큐레이션에는 MCP 자동 등록 스크립트가 포함되어 있지 않습니다. 아래 항목은 외부 도구를 별도로 구성할 때의 경계입니다.
 
 ### 자동화 기능 경계
 
 | 능력| 자동으로 등록할 수 있습니다| 방법| 설명|
 |------|-----------|------|------|
-| jshookmcp | ✓ | npm-mcp(npx 시작)| Claude MCP 구성 자동 작성|
-| anything-analyzer | ✓ | local-http-mcp | 자동등록 + 자동서비스 시작|
-| Node.js | ✓ | 윙렛 설치| 런타임 종속성|
+| jshookmcp | ✗ | MCP 클라이언트에 별도 등록 | Node.js 22.12 이상 또는 24.x 필요 |
+| everything-analyzer | ✗ | 별도 프로젝트와 서비스 구성 필요 | 이 저장소에 포함되지 않음 |
+| Node.js | ✗ | 공식 배포판 또는 패키지 관리자로 설치 | 런타임 종속성 |
 
-### 부트스트랩 모드
+### jshookmcp 등록 예
 
-```powershell
-# MCP 구성에 jshookmcp 등록
-powershell -File "<skill-root>\scripts\bootstrap-reverse.ps1" -Capability @('jshookmcp')
-
-# 무엇이든 분석기 등록 및 시작
-powershell -File "<skill-root>\scripts\bootstrap-reverse.ps1" -Capability @('anything-analyzer') -StartServices
+```json
+{
+  "command": "npx",
+  "args": ["-y", "@jshookmcp/jshook@0.3.3"]
+}
 ```
 
 ### 주의할 점
 
 - `jshookmcp` 등록 후에도 AI 클라이언트에서 MCP 서버를 호출하려면 **활성화**해야 합니다.
-- `anything-analyzer` pnpm 및 프로젝트 소스 코드가 필요하며 부트스트랩은 자동으로 종속 항목을 복제하고 설치합니다.
-- Node.js가 설치되지 않은 경우 먼저 Winget을 통해 부트스트랩이 설치됩니다. Node.js 22
+- 예시는 2026-07-14에 검토한 `0.3.3`을 의도적으로 고정합니다. npm의 2026-07-15 최신 릴리스는 `0.3.4`이므로, 업그레이드할 때는 릴리스 노트·도구 스키마·보안 권고를 다시 검토하세요.
+- `everything-analyzer`는 pnpm 및 별도 프로젝트 소스 코드가 필요하며 이 저장소가 자동 설치하지 않습니다.
+- jshookmcp의 현재 런타임 요구사항은 Node.js 22.12 이상 또는 24.x입니다.

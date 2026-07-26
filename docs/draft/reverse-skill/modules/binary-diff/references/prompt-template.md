@@ -42,16 +42,19 @@ found_vcall:
 found_call:
   - insn_va: '0x180888800'
     insn_disasm: call sub_180999900
+    target_va: '0x180999900'
     func_name: CLoopMode_RegisterEventMapInternal
 
 found_funcptr:
   - insn_va: '0x180666600'
     insn_disasm: lea rdx, sub_15BC910
+    target_va: '0x15BC910'
     funcptr_name: CLoopMode_OnClientPollNetworking
 
 found_gv:
   - insn_va: '0x180444400'
     insn_disasm: mov rcx, cs:qword_180666600
+    target_va: '0x180666600'
     gv_name: g_pNetworkMessages
 
 found_struct_offset:
@@ -78,15 +81,15 @@ found_struct_offset:
 
 ## 일괄 호출 스크립트 뼈대(Python)
 
+아래 코드와 같은 디렉터리의 `prompt-template.txt`에는 이 문서 전체가 아니라 위 4중 코드 펜스 안의 프롬프트 본문만 저장하세요.
+
 ```python
 import yaml
 import httpx
-import json
-from pathlib import Path
 
-PROMPT_TEMPLATE = open("prompt-template.txt").read()
+PROMPT_TEMPLATE = open("prompt-template.txt", encoding="utf-8").read()
 
-def migrate_function(ref_disasm, ref_procedure, target_disasm, target_procedure, symbols, api_url, api_key, model="deepseek-chat"):
+def migrate_function(ref_disasm, ref_procedure, target_disasm, target_procedure, symbols, api_url, api_key, model):
     prompt = PROMPT_TEMPLATE.format(
         disasm_for_reference=ref_disasm,
         procedure_for_reference=ref_procedure,
@@ -100,6 +103,7 @@ def migrate_function(ref_disasm, ref_procedure, target_disasm, target_procedure,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0
     }, headers={"Authorization": f"Bearer {api_key}"}, timeout=60)
+    resp.raise_for_status()
 
     content = resp.json()["choices"][0]["message"]["content"]
 
@@ -114,8 +118,8 @@ def migrate_function(ref_disasm, ref_procedure, target_disasm, target_procedure,
     return yaml.safe_load(yaml_str)
 
 
-def apply_results(results, ida_session):
-    """파싱된 YAML 결과를 IDA에 적용"""
+def build_candidate_plan(results):
+    """파싱된 YAML에서 검증 전 후보 계획을 생성(IDA에는 쓰지 않음)"""
     if not results:
         return
 
@@ -124,17 +128,18 @@ def apply_results(results, ida_session):
 
     if "found_call" in results:
         for item in results["found_call"]:
-            # insn_disasm에서 호출 대상 추출
-            # sub_XXXXXXX를 호출 → sub_XXXXXXX의 주소 추출
-            renames.append({"addr": item["insn_va"], "name": item["func_name"], "type": "call_target"})
+            int(item["target_va"], 0)  # 주소 형식 검증; IDA 피연산자와 별도 대조 필요
+            renames.append({"addr": item["target_va"], "name": item["func_name"], "type": "call_target"})
 
     if "found_funcptr" in results:
         for item in results["found_funcptr"]:
-            renames.append({"addr": item["insn_va"], "name": item["funcptr_name"], "type": "funcptr_target"})
+            int(item["target_va"], 0)
+            renames.append({"addr": item["target_va"], "name": item["funcptr_name"], "type": "funcptr_target"})
 
     if "found_gv" in results:
         for item in results["found_gv"]:
-            renames.append({"addr": item["insn_va"], "name": item["gv_name"], "type": "gv"})
+            int(item["target_va"], 0)
+            renames.append({"addr": item["target_va"], "name": item["gv_name"], "type": "gv"})
 
     if "found_vcall" in results:
         for item in results["found_vcall"]:
@@ -156,18 +161,10 @@ def apply_results(results, ida_session):
 ## API 구성 제안
 
 ```yaml
-# 기본값은 DeepSeek(저렴함)입니다.
+# 이 코드는 OpenAI 호환 Chat Completions 응답 형식용 예시입니다.
 default:
-  api_url: "https://api.deepseek.com/v1/chat/completions"
-  model: "deepseek-chat"
-
-# 매우 큰 기능은 GPT로 대체됩니다.
-fallback:
-  api_url: "https://api.openai.com/v1/chat/completions"
-  model: "gpt-4o"
-
-# 아니면 클로드를 이용하세요
-alternative:
-  api_url: "https://api.anthropic.com/v1/messages"
-  model: "claude-sonnet-4-20250514"
+  api_url: "https://provider.example/v1/chat/completions"
+  model: "reviewed-model-id"
 ```
+
+제공자마다 인증 헤더와 요청·응답 형식이 다릅니다. 특히 Anthropic Messages API는 위 코드의 Chat Completions 파서와 호환되지 않으므로 별도 어댑터를 사용하세요. 모델 ID는 실행 시점의 공식 제공자 문서와 내부 평가를 기준으로 설정합니다.

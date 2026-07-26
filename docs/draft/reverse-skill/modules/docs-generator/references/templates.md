@@ -3,8 +3,8 @@
 ## 목차
 
 - [README.md](#readmemd)
-- [API 엔드포인트 문서](#api-endpoint-documentation)
-- [파일 시스템 구성](#file-system-organization)
+- [API 엔드포인트 문서](#api-엔드포인트-문서)
+- [파일 시스템 구성](#파일-시스템-구성)
 
 ## README.md
 
@@ -63,7 +63,7 @@ Retrieves resources.
 
 \`\`\`json
 {
-  "data": [...],
+  "data": [],
   "total": 100
 }
 \`\`\`
@@ -84,7 +84,7 @@ const { data } = await api.get("/resource", { limit: 10 });
 
 ## 파일 시스템 구성
 
-```
+```text
 /docs
 ├── README.md              # Docs index
 ├── /api

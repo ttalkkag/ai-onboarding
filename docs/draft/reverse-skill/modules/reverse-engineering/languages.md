@@ -1,26 +1,26 @@
 # CTF 리버스 - 언어별 기술
 
 ## 목차
-- [Python 바이트코드 반전(dis.dis 출력)](#python-bytecode-reversing-disdis-output)
-  - [공통 패턴: 분할 인덱스를 사용한 XOR 검증](#common-pattern-xor-validation-with-split-indices)
-  - [바이트코드 분석 팁](#bytecode-analytic-tips)
-- [Python Opcode 재매핑](#python-opcode-remapping)
-  - [신분증](#identification)
+- [Python 바이트코드 반전(dis.dis 출력)](#python-바이트코드-반전disdis-출력)
+  - [일반적인 패턴: 분할 인덱스를 사용한 XOR 검증](#일반적인-패턴-분할-인덱스를-사용한-xor-검증)
+  - [바이트코드 분석 팁](#바이트코드-분석-팁)
+- [Python Opcode 재매핑](#python-opcode-재매핑)
+  - [Identification](#identification)
   - [Recovery](#recovery)
-- [Pyarmor 8/9 정적 언팩(1샷)](#pyarmor-89-static-unpack-1shot)
-- [DOS 스텁 분석](#dos-stub-analytic)
-- [HarmonyOS HAP/ABC 리버스(abc-decompiler)](#harmonyos-hapabc-reverse-abc-decompiler)
+- [Pyarmor 8/9 정적 포장 풀기(1샷)](#pyarmor-89-정적-포장-풀기1샷)
+- [DOS 스텁 분석](#dos-스텁-분석)
+- [HarmonyOS HAP/ABC 역방향(abc-디컴파일러)](#harmonyos-hapabc-역방향abc-디컴파일러)
 - [Brainfuck/Esolangs](#brainfuckesolangs)
-  - [Brainfuck 문자별 정적 분석(BSidesSF 2026)](#brainfuck-character-by-character-static-analytic-bsidessf-2026)
-  - [읽기 횟수 Oracle을 통한 Brainfuck 사이드 채널(BSidesSF 2026)](#brainfuck-side-channel-via-read-count-oracle-bsidessf-2026)
-  - [Brainfuck 비교 관용구 감지(BSidesSF 2026)](#brainfuck-comparison-idiom-Detection-bsidessf-2026)
-- [UEFI 바이너리 분석](#uefi-binary-analytic)
-- [C로 변환](#transpilation-to-c)
-- [코드 커버리지 부채널 공격](#code-coverage-side-channel-attack)
-- [기능적 언어 반전(OPAL)](#기능적 언어-반전-opal)
-- [Python 버전별 바이트코드(VuwCTF 2025)](#python-version-Specific-bytecode-vuwctf-2025)
-- [비전단사적 치환 암호역전](#비전단사적 치환-암호-역전)
-- [FRACTRAN 프로그램 반전(Boston Key Party 2016)](#fractran-program-inversion-boston-key-party-2016)
+  - [Brainfuck 문자별 정적 분석(BSidesSF 2026)](#brainfuck-문자별-정적-분석bsidessf-2026)
+  - [읽기 횟수 Oracle을 통한 Brainfuck 사이드 채널(BSidesSF 2026)](#읽기-횟수-oracle을-통한-brainfuck-사이드-채널bsidessf-2026)
+  - [Brainfuck 비교 관용구 감지(BSidesSF 2026)](#brainfuck-비교-관용구-감지bsidessf-2026)
+- [UEFI 바이너리 분석](#uefi-바이너리-분석)
+- [C로 변환](#c로-변환)
+- [코드 커버리지 부채널 공격](#코드-커버리지-부채널-공격)
+- [기능적 언어 역전(OPAL)](#기능적-언어-역전opal)
+- [Python 버전별 바이트코드(VuwCTF 2025)](#python-버전별-바이트코드vuwctf-2025)
+- [비단사적 대체 암호 역전](#비단사적-대체-암호-역전)
+- [FRACTRAN 프로그램 반전(Boston Key Party 2016)](#fractran-프로그램-반전boston-key-party-2016)
 
 platform/framework-specific 기술(Android, Electron, Node.js, Verilog, Ruby/Perl 다중 언어 등)에 대해서는 [languages-platforms.md](languages-platforms.md)를 참조하세요.
 Go 및 Rust 바이너리 리버싱에 대해서는 [languages-compiled.md](languages-compiled.md)를 참조하세요.
@@ -47,13 +47,15 @@ print(''.join(flag))
 ```
 
 ### 바이트코드 분석 팁
+opcode 이름과 인코딩은 CPython 버전에 따라 바뀝니다. 먼저 `.pyc` 매직과 생성 버전을 식별하고 그 버전의 `dis` 문서를 기준으로 읽으세요. 예를 들어 Python 3.11+에서는 여러 이항 연산이 `BINARY_OP` 인수로 통합되고, 구형 `CALL_FUNCTION` 계열은 `PRECALL`/`CALL` 등의 호출 시퀀스로 바뀌었습니다.
+
 - `LOAD_CONST` 다음에 `COMPARE_OP`를 입력하면 예상 값이 표시됩니다.
-- `BINARY_XOR`는 변환을 식별합니다.
+- 해당 버전의 `BINARY_XOR` 또는 `BINARY_OP` XOR 인수는 변환을 식별합니다.
 - `BUILD_TUPLE`/`BUILD_LIST` 상수 포함 = 예상 출력 배열
 - 루프 구조: `FOR_ITER` + `BINARY_SUBSCR` = 플래그 문자 반복
-- `CALL_FUNCTION` on `ord` = 문자를 정수로 변환
+- `ord`를 불러온 뒤 해당 버전의 호출 opcode 시퀀스 = 문자를 정수로 변환
 
-**주요 통찰력:** Python 바이트코드 문제는 명시적 스택 작업의 알고리즘을 제공합니다. `LOAD_CONST` 값(예상 출력), `BINARY_XOR`/`BINARY_ADD`(변환) 및 `BUILD_TUPLE`(대상 배열)에 중점을 두어 바이트코드를 실행하지 않고 유효성 검사 논리를 재구성합니다.
+**주요 통찰력:** Python 바이트코드 문제는 명시적 스택 작업의 알고리즘을 제공합니다. `LOAD_CONST` 값, 버전에 맞는 산술·호출 opcode, `BUILD_TUPLE` 같은 컨테이너 생성을 따라 바이트코드를 실행하지 않고 유효성 검사 논리를 재구성합니다.
 
 ---
 
@@ -71,7 +73,7 @@ Opcode 오류로 인해 디컴파일러가 실패합니다.
 
 **바로가기(Hack.lu CTF 2013):** 챌린지에서 수정된 자체 Python 인터프리터(예: 사용자 정의 `./py` 바이너리)를 번들로 묶는 경우 `uncompyle2`/`uncompyle6`를 해당 인터프리터 환경에 설치하고 챌린지 자체 런타임을 사용하여 디컴파일합니다. 수정된 인터프리터는 자체 opcode 매핑을 이해하므로 표준 디컴파일 도구는 수동 opcode 복구 없이 작동합니다.
 
-**Python 버전별 도구 선택:** `uncompyle6` Python 2.x–3.8을 지원합니다. Python 3.9+ 바이트코드의 경우 [`pycdc`](https://github.com/zrax/pycdc)(소스에서 컴파일: `git clone && cmake. && make`)를 사용하세요.
+**Python 버전별 도구 선택:** `uncompyle6` Python 2.x–3.8 계열을 주로 대상으로 합니다. 더 최신 바이트코드는 도구별 지원표를 확인한 뒤 [`pycdc`](https://github.com/zrax/pycdc)를 시도하세요(소스에서 컴파일: `git clone`, `cmake .`, `make`).
 
 **주요 통찰력:** Opcode 재매핑은 모든 표준 디컴파일러를 손상시킵니다. 가장 빠른 해결 방법은 PyInstaller 번들에서 수정된 `opcode.pyc`를 찾아서 기본 Python opcode와 비교한 다음 디컴파일하기 전에 대상 `.pyc`을 다시 표준 opcode로 패치하는 것입니다.
 
@@ -131,7 +133,7 @@ PE 파일은 DOS 스텁의 코드를 숨길 수 있습니다.
 - `java -jar` GUI 모드로 들어갈 수 있음
 - CLI 모드의 경우 항상 다음을 사용하세요.
 
-```bash
+```text
 java -cp "./jadx-dev-all.jar" jadx.cli.JadxCLI [options] <input>
 ```
 
@@ -259,12 +261,11 @@ flag = []
 for pos in range(50):  # max flag length
     best_byte = None
     max_reads = 0
-    baseline = bytes_read_running_bf(bf, flag + [PRINTABLE[0]], braces)
-    for b in PRINTABLE[1:]:
+    for b in PRINTABLE:
         reads = bytes_read_running_bf(bf, flag + [b], braces)
-        if reads > baseline:
+        if reads > max_reads:
+            max_reads = reads
             best_byte = b
-            break
     if best_byte is None:
         break
     flag.append(best_byte)
@@ -277,30 +278,22 @@ print(bytes(flag).decode())
 
 ### Brainfuck 비교 관용구 감지(BSidesSF 2026)
 
-**패턴(i-love-my-bf-part3):** 고급 언어에서 컴파일된 BF 프로그램은 인식 가능한 비교 관용어를 사용합니다. 동등성 검사 `<[-<->] +<[>-<[-]]>[-<+>]`는 인접한 두 셀을 비교합니다. 실행 중에 이 패턴을 감지하도록 BF 인터프리터를 계측하면 테이프에서 직접 비교 피연산자(예상 플래그 바이트)를 추출할 수 있습니다.
+**패턴(i-love-my-bf-part3):** 특정 컴파일러가 만든 BF 프로그램은 반복되는 비교 관용어를 사용할 수 있습니다. 이 사례의 정규화된 연산열 `<[-<->]+<[>-<[-]]>[-<+>]`을 먼저 찾고, 피연산자를 추출하려면 완전한 BF 인터프리터에서 해당 위치의 실행 직전 테이프 상태를 기록합니다. 이 연산열이 모든 BF 컴파일러의 보편적인 동등성 구현은 아닙니다.
 
 ```python
-EQ_PATTERN = "<[-<->] +<[>-<[-]]>[-<+>]"
+BF_OPS = set("><+-.,[]")
+EQ_PATTERN = "<[-<->]+<[>-<[-]]>[-<+>]"
 
-def instrumented_bf_run(bf_code, dummy_input):
-    """Run BF, detect equality comparisons, extract operands."""
-    tape = [0] * 30000
-    ptr = ip = 0
-    comparisons = []
+def comparison_sites(bf_code):
+    """Return offsets in the normalized BF instruction stream."""
+    normalized = ''.join(ch for ch in bf_code if ch in BF_OPS)
+    return [
+        i for i in range(len(normalized) - len(EQ_PATTERN) + 1)
+        if normalized.startswith(EQ_PATTERN, i)
+    ]
 
-    while ip < len(bf_code):
-        # Check if current position starts the eq pattern
-        if bf_code[ip:ip+len(EQ_PATTERN)] == EQ_PATTERN:
-            # The two cells being compared are at ptr-2 and ptr-1
-            lhs = tape[ptr - 2]  # User input byte
-            rhs = tape[ptr - 1]  # Expected byte
-            comparisons.append((chr(lhs), chr(rhs)))
-        # ... normal BF execution ...
-        ip += 1
-
-    return comparisons
-
-# Expected bytes from comparisons reveal the flag
+# Add a hook at these instruction offsets in a complete interpreter and log
+# the compiler-specific operand cells before the first instruction executes.
 ```
 
 **주요 통찰력:** 컴파일된 BF 프로그램은 동등 비교, 조건 분기 및 루프와 같은 작업에 고정된 관용구를 재사용합니다. BF 소스에서 또는 실행 중에 이러한 관용구를 패턴 일치시키면 프로그램 논리를 완전히 이해하지 않고도 상수를 추출할 수 있습니다.
@@ -308,7 +301,7 @@ def instrumented_bf_run(bf_code, dummy_input):
 **일반적인 BF 관용어:**
 - `[-]` — 셀 지우기(0으로 설정)
 - `[->+<]` — 셀을 오른쪽으로 이동
-- `<[-<->] +<[>-<[-]]>[-<+>]` — 두 셀의 동일성 비교
+- `<[-<->]+<[>-<[-]]>[-<+>]` — 이 사례 컴파일러의 두 셀 비교 관용구
 
 **참조:** BSidesSF 2026 "i-love-my-bf-part3"
 
@@ -318,14 +311,14 @@ def instrumented_bf_run(bf_code, dummy_input):
 
 ```bash
 7z x firmware.bin -oextracted/
-file extracted/* | grep "PE32+"
+file extracted/* | grep -E "PE32|PE32\+|TE executable"
 ```
 
 - Bootkit은 부트 로더를 대체합니다.
 - 커스텀 VM은 복호화를 보호합니다.
 - VM 바이트코드를 C로 리프트
 
-**주요 정보:** UEFI 바이너리는 PE32+ 실행 파일입니다. `7z`로 펌웨어를 추출하고, `file`로 PE 파일을 식별하고 Ghidra/IDA.에 로드합니다. 부트킷은 부트 로더를 대체하므로 챌린지 로직에 대해서는 DXE 드라이버 및 부트 서비스 프로토콜에 중점을 둡니다.
+**주요 정보:** UEFI 펌웨어 볼륨의 실행 이미지는 PE32, PE32+, 또는 TE 형식일 수 있습니다. `7z`나 펌웨어 전용 파서로 추출하고 형식을 확인한 뒤 Ghidra/IDA에 로드합니다. 챌린지 로직은 DXE 드라이버와 부트 서비스 프로토콜에 있을 수 있습니다.
 
 ---
 
@@ -340,9 +333,9 @@ for opcode, args in instructions:
         print(f"r{args[0]} += r{args[1]};")
 ```
 
-지속적인 접기를 위해 `-O3`로 컴파일합니다.
+상수와 데이터 흐름이 컴파일러에 보이도록 리프팅한 뒤 `-O3`로 컴파일해 단순화 결과를 비교합니다.
 
-**주요 통찰력:** 난독화된 VM 바이트코드를 C로 트랜스파일하고 `-O3`로 컴파일하면 컴파일러의 상수 폴딩 및 데드 코드 제거를 통해 알고리즘이 자동으로 단순화됩니다. 이는 복잡한 명령 세트에 대한 수동 난독화보다 빠릅니다.
+**주요 통찰력:** 난독화된 VM 바이트코드를 C로 정확히 리프트하고 상수·부작용을 컴파일러가 볼 수 있게 하면 `-O3`의 상수 폴딩과 데드 코드 제거가 일부 경로를 단순화할 수 있습니다. 입력 의존 상태나 외부 부작용이 남아 있으면 자동으로 단순해진다고 가정하지 마세요.
 
 ---
 
@@ -430,7 +423,7 @@ for total_offset_S in range(256):
 
 **패턴(새로운 머신):** 챌린지는 특정 Python 버전(예: 3.14.0 알파)을 대상으로 합니다.
 
-**주요 요구 사항:** 정확한 Python 버전을 컴파일하여 바이트코드를 분해합니다. — alpha/beta 버전은 안정 릴리스와 다른 opcode를 갖습니다.
+**주요 요구 사항:** 정확한 Python 버전을 격리된 환경에 컴파일하여 바이트코드를 분해합니다. alpha/beta 버전은 안정 릴리스와 다른 opcode를 가질 수 있습니다. `marshal`은 신뢰하지 않는 입력에 안전한 형식이 아니므로 호스트 인터프리터에서 바로 로드하지 마세요.
 
 ```bash
 # Build specific Python version
@@ -444,7 +437,10 @@ cd Python-3.14.0a4 && ./configure && make -j$(nproc)
 ```python
 # Reverse: flag[i] = sqrt(expected_tuple[i])
 import math
-flag = ''.join(chr(int(math.isqrt(v))) for v in expected_values)
+roots = [math.isqrt(v) for v in expected_values]
+if any(r * r != v for r, v in zip(roots, expected_values)):
+    raise ValueError("expected a tuple of perfect squares")
+flag = ''.join(chr(r) for r in roots)
 ```
 
 ---
@@ -479,7 +475,7 @@ for i, v in enumerate(sbox):
 
 ## FRACTRAN 프로그램 반전(Boston Key Party 2016)
 
-FRACTRAN: 계산이 분수 테이블에 의한 반복 곱셈인 난해한 언어입니다. 입력은 소인수 분해(순차 소수의 지수인 ASCII 값)로 인코딩됩니다. 반전하려면: 각 분수의 분자와 분모를 바꾸고 반전된 프로그램을 통해 "성공" 출력을 거꾸로 실행합니다.
+FRACTRAN은 분수 목록에서 현재 정수를 유지하는 첫 번째 곱을 선택해 반복하는 난해한 언어입니다. 입력은 소인수분해의 지수로 인코딩할 수 있습니다. 일반적으로 전이가 비단사이고 “첫 번째 적용 가능한 분수” 규칙도 있으므로, 각 분수의 분자/분모를 바꾸는 것만으로 역프로그램을 만들 수 없습니다.
 
 ```python
 # Original: for each step, find first fraction where n*frac is integer
@@ -489,11 +485,11 @@ def fractran_step(n, fractions):
             return (n * num) // den
     return None  # Halt
 
-# Inversion: swap num/denom in fraction table
-inverted = [(d, n) for n, d in fraction_table]
-# Run target output through inverted program to recover input
+# Reverse analysis: enumerate predecessor states n for which the original
+# first-applicable rule selects a fraction and fractran_step(n) == target.
+# Use known input bounds/prime exponents to keep this constraint search finite.
 ```
 
-**주요 통찰력:** FRACTRAN 프로그램은 분자와 분모를 교환하여 반전될 수 있습니다. 소인수분해 인코딩은 I/O를 이해하는 데 핵심입니다. 결과를 인수분해하여 순차 소수의 지수를 추출하고 ASCII에 매핑합니다.
+**주요 통찰력:** 소인수분해 인코딩은 I/O를 이해하는 데 핵심입니다. 역분석은 목표 정수를 인수분해한 뒤, 원래 규칙의 우선순위까지 만족하는 선행 상태를 제약 탐색하고 순차 소수의 지수를 ASCII에 매핑해야 합니다.
 
 **탐지:** 챌린지는 분수, 소인수분해를 언급하거나 유리수 목록을 제공합니다.

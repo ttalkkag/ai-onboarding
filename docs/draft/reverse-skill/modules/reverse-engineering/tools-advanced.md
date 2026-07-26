@@ -3,41 +3,41 @@
 상업용 packers/protectors, 바이너리 diffing, 난독화 프레임워크, 에뮬레이션 및 angr 이상의 기호 실행을 위한 고급 도구입니다.
 
 ## 목차
-- [VMProtect 분석](#vmprotect-analytic)
+- [VMProtect Analysis](#vmprotect-analysis)
   - [Recognition](#recognition)
   - [Approach](#approach)
   - [Tools](#tools)
-  - [CTF 전략](#ctf-strategy)
-- [테미다/윈라이센스 분석](#themida--winlicense-analysis)
-  - [테미다 인식](#themida-인식)
-  - [CTF에 대한 접근 방식](#approach-for-ctf)
-- [이진 비교](#binary-diffing)
+  - [CTF Strategy](#ctf-strategy)
+- [Themida / WinLicense 분석](#themida--winlicense-분석)
+  - [Themida Recognition](#themida-recognition)
+  - [CTF에 대한 접근 방식](#ctf에-대한-접근-방식)
+- [Binary Diffing](#binary-diffing)
   - [BinDiff](#bindiff)
   - [Diaphora](#diaphora)
-- [난독화 프레임워크](#deobfuscation-frameworks)
-  - [D-810 (IDA)](#d-810-이다)
+- [Deobfuscation Frameworks](#deobfuscation-frameworks)
+  - [D-810 (IDA)](#d-810-ida)
   - [GOOMBA (Ghidra)](#goomba-ghidra)
   - [Miasm](#miasm)
-- [Qiling 프레임워크(에뮬레이션)](#qiling-framework-emulation)
-- [트리톤(동적 기호 실행)](#triton-dynamic-symbolic-execution)
-- [만티코어(기호 실행)](#manticore-symbolic-execution)
-- [리진/커터](#리진--cutter)
-- [RetDec(리타겟팅 가능 디컴파일러)](#retdec-retargetable-decompiler)
-- [LLVM IR로 맞춤 VM 바이트코드 리프팅(Google CTF 2017)](#custom-vm-bytecode-lifting-to-llvm-ir-google-ctf-2017)
-- [고급 GDB 기술](#advanced-gdb-techniques)
-  - [파이썬 스크립팅](#python-scripting)
-  - [GDB 스크립트를 사용한 무차별 대입](#brute-force-with-gdb-script)
-  - [조건부 중단점](#conditional-breakpoints)
+- [Qiling 프레임워크(에뮬레이션)](#qiling-프레임워크에뮬레이션)
+- [Triton(동적 기호 실행)](#triton동적-기호-실행)
+- [맨티코어(기호 실행)](#맨티코어기호-실행)
+- [Rizin / Cutter](#rizin--cutter)
+- [RetDec(리타겟팅 가능 디컴파일러)](#retdec리타겟팅-가능-디컴파일러)
+- [LLVM IR로 사용자 정의 VM 바이트코드 리프팅(Google CTF 2017)](#llvm-ir로-사용자-정의-vm-바이트코드-리프팅google-ctf-2017)
+- [고급 GDB 기술](#고급-gdb-기술)
+  - [Python Scripting](#python-scripting)
+  - [GDB 스크립트를 이용한 무차별 대입](#gdb-스크립트를-이용한-무차별-대입)
+  - [Conditional Breakpoints](#conditional-breakpoints)
   - [Watchpoints](#watchpoints)
-  - [역방향 디버깅(rr)](#reverse-debugging-rr)
-  - [GDB 대시보드 / GEF / pwndbg](#gdb-dashboard--gef--pwndbg)
-- [고급 Ghidra 스크립팅](#advanced-ghidra-scripting)
-- [패치 전략](#patching-strategies)
-  - [바이너리 닌자 패치(Python API)](#binary-ninja-patching-python-api)
-  - [LIEF(실행 파일 형식 계측용 라이브러리)](#lief-library-for-instrumenting-executable-formats)
-- [ILP/LP 솔버를 사용한 GDB 제약 조건 추출(BackdoorCTF 2017)](#gdb-constraint-extraction-with-ilplp-solver-backdoorctf-2017)
-- [제로 플래그 모니터링을 사용한 GDB 위치 인코딩 입력(EKOPARTY 2017)](#gdb-position-encoded-input-with-zero-flag-monitoring-ekoparty-2017)
-- [실행 전용 바이너리를 덤프하는 LD_PRELOAD(BackdoorCTF 2017)](#ld_preload-to-dump-execute-only-binary-backdoorctf-2017)
+  - [역방향 디버깅(rr)](#역방향-디버깅rr)
+  - [GDB 대시보드 / GEF / pwndbg](#gdb-대시보드--gef--pwndbg)
+- [고급 Ghidra 스크립팅](#고급-ghidra-스크립팅)
+- [Patching Strategies](#patching-strategies)
+  - [바이너리 닌자 패치(Python API)](#바이너리-닌자-패치python-api)
+  - [LIEF(실행 파일 형식 계측용 라이브러리)](#lief실행-파일-형식-계측용-라이브러리)
+- [ILP/LP 솔버를 사용한 GDB 제약 조건 추출(BackdoorCTF 2017)](#ilplp-솔버를-사용한-gdb-제약-조건-추출backdoorctf-2017)
+- [제로 플래그 모니터링 기능을 갖춘 GDB 위치 인코딩 입력(EKOPARTY 2017)](#제로-플래그-모니터링-기능을-갖춘-gdb-위치-인코딩-입력ekoparty-2017)
+- [실행 전용 바이너리를 덤프하는 LD_PRELOAD(BackdoorCTF 2017)](#실행-전용-바이너리를-덤프하는-ld_preloadbackdoorctf-2017)
 
 ---
 
@@ -51,7 +51,7 @@ VMProtect는 x86/x64 코드를 생성된 VM에서 해석되는 사용자 정의 
 # VMProtect signatures
 strings binary | grep -i "vmp\|vmprotect"
 # PE sections: .vmp0, .vmp1 (VMProtect adds its own sections)
-readelf -S binary | grep ".vmp"
+llvm-objdump --section-headers binary | grep ".vmp"
 # Large binary with entropy > 7.5 in certain sections
 ```
 
@@ -123,7 +123,7 @@ VMProtect와 유사하지만 추가 디버그 방지 레이어가 있습니다.
 3. **가져오기 수정:** IAT 재구성을 위해 Scylla 플러그인 사용
 4. **덤프된 코드에 중점:** 압축을 푼 후 일반 바이너리로 분석
 
-```bash
+```text
 # x64dbg workflow for Themida:
 1. Load binary
 2. Enable ScyllaHide → Profile: Themida
@@ -209,10 +209,13 @@ Usage: Code Browser → Analysis → GOOMBA
 ```python
 from miasm.analysis.binary import Container
 from miasm.analysis.machine import Machine
+from miasm.core.locationdb import LocationDB
 from miasm.expression.expression import *
 
 # Load binary and lift to Miasm IR
-cont = Container.from_stream(open("binary", "rb"))
+loc_db = LocationDB()
+with open("binary", "rb") as stream:
+    cont = Container.from_stream(stream, loc_db=loc_db)
 machine = Machine(cont.arch)
 mdis = machine.dis_engine(cont.bin_stream, loc_db=cont.loc_db)
 
@@ -239,30 +242,45 @@ OS 수준 지원(syscalls, 파일 시스템, 레지스트리)을 갖춘 Unicorn 
 
 ```python
 from qiling import Qiling
-from qiling.const import QL_VERBOSE
+from qiling.const import QL_INTERCEPT, QL_VERBOSE
 
 # Emulate Linux ELF
-ql = Qiling(["./binary"], "rootfs/x8664_linux",
-            verbose=QL_VERBOSE.DEBUG)
+linux_ql = Qiling(["./binary"], "rootfs/x8664_linux",
+                  verbose=QL_VERBOSE.DEBUG)
 
 # Hook specific address
-@ql.hook_address
-def hook_check(ql, address, size):
-    if address == 0x401234:
-        ql.arch.regs.rax = 0  # Bypass check
-        ql.log.info("Anti-debug bypassed")
+def hook_check(ql):
+    ql.arch.regs.rax = 0  # Bypass check
+    ql.log.info("Anti-debug bypassed")
+
+linux_ql.hook_address(hook_check, 0x401234)
 
 # Hook syscall
-@ql.hook_syscall(name="ptrace")
 def hook_ptrace(ql, request, pid, addr, data):
     return 0  # Always succeed
 
-# Hook API (Windows)
-@ql.set_api("IsDebuggerPresent", target=ql.os.user_defined_api)
+linux_ql.os.set_syscall("ptrace", hook_ptrace, QL_INTERCEPT.CALL)
+
+linux_ql.run()
+```
+
+Windows API 후크는 Windows 바이너리와 rootfs로 만든 별도 인스턴스에 등록합니다.
+
+```python
+from qiling import Qiling
+from qiling.const import QL_INTERCEPT, QL_VERBOSE
+from qiling.os.windows.api import winsdkapi
+from qiling.os.windows.fncc import STDCALL
+
+@winsdkapi(cc=STDCALL, params={})
 def hook_isdebug(ql, address, params):
     return 0
 
-ql.run()
+windows_ql = Qiling(["./target.exe"], "rootfs/x8664_windows",
+                    verbose=QL_VERBOSE.DEBUG)
+windows_ql.os.set_api("IsDebuggerPresent", hook_isdebug, QL_INTERCEPT.CALL)
+
+windows_ql.run()
 ```
 
 **유니콘에 비해 장점:**
@@ -273,7 +291,7 @@ ql.run()
 
 **CTF 사용 사례:**
 - 외부 아키텍처용 바이너리 에뮬레이션(ARM, MIPS, RISC-V)
-- 모든 안티 디버그를 한 번에 우회(디버거 아티팩트 없음)
+- 디버거 아티팩트가 적은 환경에서 대상별 API/syscall 검사를 후크
 - 하드웨어가 없는 Fuzz embedded/IoT 펌웨어
 - 코드 수정 없이 실행 추적
 
@@ -281,7 +299,7 @@ ql.run()
 
 ## Triton(동적 기호 실행)
 
-기호 실행, 오염 분석 및 AST 단순화 기능을 갖춘 핀 기반 동적 바이너리 분석 프레임워크입니다.
+기호 실행, 오염 분석 및 AST 단순화 기능을 제공하는 동적 바이너리 분석 라이브러리입니다. Intel Pin 통합은 별도 계측 방식 중 하나이지 Triton 자체의 필수 실행 기반은 아닙니다.
 
 ```python
 from triton import *
@@ -305,7 +323,7 @@ while pc:
 
     # At comparison point, extract path constraint
     if pc == CMP_ADDR:
-        ast = ctx.getPathConstraintsAst()
+        ast = ctx.getPathPredicate()
         model = ctx.getModel(ast)
         for k, v in sorted(model.items()):
             print(f"input[{k}] = {chr(v.getValue())}", end="")
@@ -383,19 +401,21 @@ cutter binary           # Open in GUI with decompiler
 다양한 아키텍처를 지원하는 LLVM 기반 디컴파일러입니다. 무료이며 오픈 소스입니다.
 
 ```bash
-# Install
-pip install retdec-decompiler
-# Or use web: https://retdec.com/decompilation/
+# Install a prebuilt release or build a tagged release as documented at:
+# https://github.com/avast/retdec#installation
+RETDEC_INSTALL_DIR=/path/to/retdec
 
 # CLI
-retdec-decompiler binary
+"$RETDEC_INSTALL_DIR/bin/retdec-decompiler" binary
 # Outputs: binary.c (decompiled C), binary.dsm (disassembly)
 
 # Specific function
-retdec-decompiler --select-ranges 0x401000-0x401100 binary
+"$RETDEC_INSTALL_DIR/bin/retdec-decompiler" --select-ranges 0x401000-0x401100 binary
 ```
 
-**강점:** 멀티 아키텍처 지원(x86, ARM, MIPS, PowerPC, PIC32), 무료, 컴파일 가능한 C 생성. Ghidra에서 제대로 지원되지 않는 아키텍처에 적합합니다.
+RetDec는 현재 limited-maintenance 상태이므로 사용 중인 릴리스의 README와 `--help`에서 옵션·지원 범위를 확인하세요.
+
+**강점:** 멀티 아키텍처 지원(x86, ARM, MIPS, PowerPC, PIC32), 무료, C형 출력 생성. 출력이 재컴파일되거나 원본과 행동 동등하다고 자동으로 가정하지 마세요.
 
 ---
 
@@ -452,6 +472,8 @@ class TraceCompare(gdb.Breakpoint):
 
 ### GDB 스크립트를 이용한 무차별 대입
 
+다음은 입력 전달·inferior 재시작·성공 판정이 생략된 알고리즘 골격이며 그대로 실행되는 GDB 스크립트가 아닙니다. 실제 스크립트는 임시 입력 파일/PTY를 연결하고, 위치별 성공 분기와 EOF 조건을 대상에 맞게 구현해야 합니다.
+
 ```python
 # Byte-by-byte brute force via GDB Python API
 import gdb, string
@@ -476,7 +498,7 @@ def bruteforce_flag(check_addr, success_addr, fail_addr, flag_len):
 
 ### Conditional Breakpoints
 
-```bash
+```text
 # Break only when register has specific value
 (gdb) b *0x401234 if $rax == 0x41
 (gdb) b *0x401234 if *(char*)$rdi == 'f'
@@ -496,7 +518,7 @@ def bruteforce_flag(check_addr, success_addr, fail_addr, flag_len):
 
 ### Watchpoints
 
-```bash
+```text
 # Hardware watchpoint — break when memory changes
 (gdb) watch *(int*)0x601050        # Break on write to address
 (gdb) rwatch *(int*)0x601050       # Break on read
@@ -511,7 +533,7 @@ def bruteforce_flag(check_addr, success_addr, fail_addr, flag_len):
 
 ### 역방향 디버깅(rr)
 
-```bash
+```text
 # Record execution
 rr record ./binary
 # Replay with reverse execution support
@@ -600,7 +622,7 @@ decomp.openProgram(currentProgram)
 
 for func in fm.getFunctions(True):
     result = decomp.decompileFunction(func, 30, monitor)
-    if result.depiledFunction():
+    if result.decompileCompleted():
         code = result.getDecompiledFunction().getC()
         if "strcmp" in code or "memcmp" in code:
             print(f"Comparison in {func.getName()} at {func.getEntryPoint()}")
@@ -640,8 +662,8 @@ binary = lief.parse("binary")
 # Add a new section
 section = lief.ELF.Section(".patch")
 section.content = list(b"\xcc" * 0x100)
-section.type = lief.ELF.SECTION_TYPES.PROGBITS
-section.flags = lief.ELF.SECTION_FLAGS.EXECINSTR | lief.ELF.SECTION_FLAGS.ALLOC
+section.type = lief.ELF.Section.TYPE.PROGBITS
+section.flags = lief.ELF.Section.FLAGS.EXECINSTR | lief.ELF.Section.FLAGS.ALLOC
 binary.add(section)
 
 # Modify entry point
@@ -706,29 +728,30 @@ class CmpLogger(gdb.Breakpoint):
 
 ## 제로 플래그 모니터링 기능을 갖춘 GDB 위치 인코딩 입력(EKOPARTY 2017)
 
-`input[i] = i`(위치 인코딩) 위치에 입력을 보냅니다. CPU 제로 플래그(ZF)를 모니터링하는 바이너리를 통해 단일 단계를 수행합니다. 특정 포지션의 값과 관련된 비교에서 ZF가 설정되면 비교가 일치합니다. 해당 포지션에 대한 예상 값을 기록합니다.
+`input[i] = i`처럼 서로 다른 tag를 입력해 어떤 위치가 비교에 도달하는지 추적할 수 있습니다. 다만 ZF는 마지막 flag-setting 명령의 두 피연산자가 같았다는 사실만 나타내며, 위치나 기대 key byte를 스스로 인코딩하지 않습니다. 검증한 `cmp` 직후에 멈춰 두 피연산자와 ZF를 함께 기록하고, 직접 비교인지 변환 후 비교인지 확인해야 합니다.
 
 ```python
 import gdb
 
-# Script: single-step binary with position-encoded input, watch ZF
-class ZFMonitor(gdb.Breakpoint):
+# Target-specific skeleton: break immediately after a verified CMP and provide
+# a callback that reads that CMP's still-available register/memory operands.
+class CompareMonitor(gdb.Breakpoint):
+    def __init__(self, after_cmp_addr, read_operands):
+        super().__init__(f"*{after_cmp_addr}")
+        self.read_operands = read_operands
+
     def stop(self):
         zf = (int(gdb.parse_and_eval('$eflags')) >> 6) & 1
-        if zf:
-            rip = int(gdb.parse_and_eval('$rip'))
-            # Disassemble at rip to find the compared immediate
-            disasm = gdb.execute(f'x/1i {rip-5}', to_string=True)
-            print(f"ZF set at {rip:#x}: {disasm.strip()}")
+        lhs, rhs = self.read_operands()
+        rip = int(gdb.parse_and_eval('$rip'))
+        print(f"after cmp at {rip:#x}: lhs={lhs:#x} rhs={rhs:#x} zf={zf}")
         return False
 
 # Run once with input b'\x00\x01\x02\x03...\x1f'
-# ZF fires when comparison matches the position's own value -> that IS the key byte
+# A tag identifies a position only when an operand contains it directly.
 ```
 
-수동으로 반전하지 않고 한 번에 각 입력 바이트를 필요한 값으로 매핑합니다.
-
-**주요 정보:** 제로 플래그 모니터링과 결합된 위치 인코딩 입력(`input[i]=i`)은 한 번의 패스로 전체 key/password를 보여줍니다. 제로 플래그는 위치 i에 대한 예상 값이 i 자체와 같을 때 실행됩니다.
+직접 `input[i]`와 상수를 비교하는 대상이라면 tag로 위치를 식별하고 다른 피연산자에서 상수를 읽을 수 있습니다. 입력이 먼저 변환되거나 여러 바이트가 결합되면 그 데이터 흐름을 별도로 역산해야 합니다.
 
 **참고자료:** EKOPARTY CTF 2017
 
@@ -738,7 +761,7 @@ class ZFMonitor(gdb.Breakpoint):
 
 바이너리에는 실행 전용 권한(모드 `--x`, 읽기 비트 없음)이 있습니다. 파일을 직접 읽거나 표준 도구를 사용하여 읽을 수는 없지만 커널은 실행 시 파일을 메모리에 매핑합니다.
 
-프로세스 내부에서 실행되고 `/proc/self/mem`를 통해 자체 메모리를 읽는 생성자가 있는 공유 라이브러리를 LD_PRELOAD:
+프로세스 내부에서 실행되고 `/proc/self/mem`를 통해 자체 메모리를 읽는 생성자가 있는 공유 라이브러리를 LD_PRELOAD합니다. secure-execution 모드(setuid/setgid 등)에서는 `LD_PRELOAD`가 무시·제한될 수 있습니다.
 
 ```c
 // dump_xo.c — compile: gcc -shared -fPIC -o dump_xo.so dump_xo.c
@@ -774,6 +797,6 @@ __attribute__((constructor)) void dump() {
 // Usage: LD_PRELOAD=./dump_xo.so ./binary_xo
 ```
 
-**주요 통찰력:** 실행 전용은 파일 읽기를 차단하지만 실행은 차단하지 않습니다. LD_PRELOAD 생성자는 `/proc/self/mem`가 파일 권한에 관계없이 매핑된 메모리에 대한 액세스를 제공하는 프로세스 내에서 실행됩니다.
+**주요 통찰력:** 실행 전용 파일도 실행 시 세그먼트가 메모리에 매핑됩니다. 정책이 허용하면 프로세스 내부에서 `/proc/self/mem`로 매핑을 읽을 수 있지만, 위 코드는 경로와 일치하는 첫 매핑 하나만 덤프하므로 전체 ELF 복사본이 아닙니다. 모든 PT_LOAD 매핑을 파일 오프셋·권한과 함께 수집하고 ELF를 재구성해야 하며, Yama/LSM·커널 버전·secure execution에 따라 접근이나 preload가 차단될 수 있습니다.
 
 **참조:** BackdoorCTF 2017

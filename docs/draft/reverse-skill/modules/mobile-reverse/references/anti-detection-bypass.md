@@ -28,8 +28,8 @@ Layer 2: Runtime detection (continuous)
 | 탐지 라이브러리| 탐지 방법| 우회|
 |--------|---------|---------|
 | RootBeer | 8가지 테스트 조합| Hook 각 탐지 방법이 false를 반환함|
-| SafetyNet | Google Play 서비스 원격 인증| Magisk Hide/Shamiko/Play 무결성 수정 사용|
-|Google Play 무결성| SafetyNet 교체| Trickystore + PIF |
+| SafetyNet Attestation(종료됨) | 2025년 1월 종료된 레거시 원격 인증 | 현재 테스트 기준으로 사용하지 않음 |
+| Google Play Integrity API | SafetyNet을 대체한 현재 무결성 신호 | 승인된 테스트 앱에서 서버 판정과 오류 처리를 검증 |
 | 커스텀 네이티브 감지| syscall 읽기 /proc/self/status| syscall을 후크하거나 /proc 마운트를 수정하세요.|
 
 ### Frida 종합 우회
@@ -76,7 +76,7 @@ var paths = [
 // Hook fileExistsAtPath returns NO
 
 // 2. Fork detection (forbidden in sandbox)
-var fork_ptr = Module.findExportByName("libSystem.B.dylib", "fork");
+var fork_ptr = Process.getModuleByName("libSystem.B.dylib").findExportByName("fork");
 Interceptor.replace(fork_ptr, new NativeCallback(function() {
     return -1;
 }, 'int', []));
@@ -87,7 +87,7 @@ var LSApplicationWorkspace = ObjC.classes.LSApplicationWorkspace;
 // Hook defaultWorkspace → canOpenURL → return NO for cydia://
 
 // 4. Signature detection
-var MISValidateSignature = Module.findExportByName(null, "MISValidateSignature");
+var MISValidateSignature = Module.findGlobalExportByName("MISValidateSignature");
 Interceptor.attach(MISValidateSignature, {
     onLeave: function(retval) { retval.replace(0); }
 });
@@ -104,10 +104,10 @@ Interceptor.attach(MISValidateSignature, {
 
 // 2. TracerPid detection
 // /proc/self/status → TracerPid: 0
-var fopen = Module.findExportByName(null, "fopen");
+var fopen = Module.findGlobalExportByName("fopen");
 Interceptor.attach(fopen, {
     onEnter: function(args) {
-        this.path = Memory.readUtf8String(args[0]);
+        this.path = args[0].readUtf8String();
     },
     onLeave: function(retval) {
         if (this.path && this.path.includes("status")) {
@@ -126,14 +126,15 @@ Debug.isDebuggerConnected.implementation = function() { return false; };
 ```javascript
 // 1. PT_DENY_ATTACH
 // ptrace(PT_DENY_ATTACH, 0, NULL, 0) → prevent debugger from attaching
-var ptrace = Module.findExportByName(null, "ptrace");
-Interceptor.replace(ptrace, new NativeCallback(function(request, pid, addr, data) {
+var ptracePtr = Module.findGlobalExportByName("ptrace");
+var originalPtrace = new NativeFunction(ptracePtr, 'int', ['int', 'int', 'pointer', 'int']);
+Interceptor.replace(ptracePtr, new NativeCallback(function(request, pid, addr, data) {
     if (request == 31) return 0; // PT_DENY_ATTACH → ignore
-    return ptrace(request, pid, addr, data);
+    return originalPtrace(request, pid, addr, data);
 }, 'int', ['int', 'int', 'pointer', 'int']));
 
 // 2. sysctl detection
-var sysctl = Module.findExportByName(null, "sysctl");
+var sysctl = Module.findGlobalExportByName("sysctl");
 Interceptor.attach(sysctl, {
     onLeave: function(retval) {
         // Modify the p_flag field of kinfo_proc → clear P_TRACED
@@ -162,21 +163,21 @@ Layer 5 — Native SSL (OpenSSL/BoringSSL): Hook SSL_get_verify_result → X509_
 레이어 1 — NSURLSession: Hook SecTrustEvaluate → kSecTrustResultProceed
 Layer 2 — Alamofire: Hook ServerTrustManager
 Layer 3 — AFNetworking: Hook AFSecurityPolicy
-Layer 4 — libcurl: LD_PRELOAD replaces SSL validation callback
+Layer 4 — libcurl/네이티브 TLS: 해당 라이브러리의 검증 콜백을 런타임 계측
 ```
 
 ### 일반적인 Objection 명령
 
 ```bash
 # Android
-objection -g "com.app" explore
+objection -n "com.app" start
 android sslpinning disable
-# 동일 효과: 위 5개 계층을 자동 Hook
+# 지원되는 프레임워크에 대한 우회 명령이며 모든 계층을 보장하지 않음
 
 # iOS
-objection -g "com.app" explore
+objection -n "com.app" start
 ios sslpinning disable
-# Equivalent to: Auto Hook 4 layers above
+# 지원되는 프레임워크에 대한 우회 명령이며 모든 계층을 보장하지 않음
 ```
 
-Source: OWASP MSTG, Frida CodeShare, 반대 위키
+Source: OWASP MASTG, Frida CodeShare, Objection wiki

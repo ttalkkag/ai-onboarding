@@ -1,21 +1,21 @@
 # CTF 리버스 - 경쟁별 패턴(1부)
 
 ## 목차
-- [숨겨진 에뮬레이터 Opcodes + LD_PRELOAD 키 추출(0xFun 2026)](#hidden-emulator-opcodes--ld_preload-key-extraction-0xfun-2026)
-- [Spectre-RSB SPN 암호 — 정적 매개변수 추출(0xFun 2026)](#spectre-rsb-spn-cipher--static-parameter-extraction-0xfun-2026)
-- [매끄러움을 통한 이미지 XOR 마스크 복구(VuwCTF 2025)](#image-xor-mask-recovery-via-smoothness-vuwctf-2025)
-- [mmap RWX를 통한 데이터 섹션의 쉘코드(VuwCTF 2025)](#shellcode-in-data-section-via-mmap-rwx-vuwctf-2025)
-- [재귀적 execve 빼기(VuwCTF 2025)](#recursive-execve-subtraction-vuwctf-2025)
-- [바이트 단위 블록 암호 공격(UTCTF 2024)](#byte-at-a-time-block-cipher-attack-utctf-2024)
-- [수학적 융합 비트맵(EHAX 2026)](#mathematical-convergence-bitmap-ehax-2026)
-- [Windows PE XOR 비트맵 추출 + OCR(srdnlenCTF 2026)](#windows-pe-xor-bitmap-extraction--ocr-srdnlenctf-2026)
-- [2단계 로더: RC4 Gate + VM 제약 조건(srdnlenCTF 2026)](#two-stage-loader-rc4-gate--vm-constraints-srdnlenctf-2026)
-- [커널 모듈 미로 해결(DiceCTF 2026)](#kernel-module-maze-solving-dicectf-2026)
-- [채널 동기화 기능을 갖춘 다중 스레드 VM(DiceCTF 2026)](#multi-threaded-vm-with-channel-synchronization-dicectf-2026)
-- [문자열 비교를 통한 백도어 공유 라이브러리 탐지(Hack.lu CTF 2012)](#backdoored-shared-library-Detection-via-string-diffing-hacklu-ctf-2012)
-- [RC4 플랫 바이너리가 포함된 사용자 정의 binfmt 커널 모듈(BSidesSF 2026)](#custom-binfmt-kernel-module-with-rc4-plat-binaries-bsidessf-2026)
-- [해시 해결된 가져오기 / 가져오기 불가 랜섬웨어(BSidesSF 2026)](#hash-resolved-imports--no-import-ransomware-bsidessf-2026)
-- [ELF 분석 방지를 위한 섹션 헤더 손상(BSidesSF 2026)](#elf-section-header-corruption-for-anti-analytic-bsidessf-2026)
+- [숨겨진 에뮬레이터 Opcode + LD_PRELOAD 키 추출(0xFun 2026)](#숨겨진-에뮬레이터-opcode--ld_preload-키-추출0xfun-2026)
+- [Spectre-RSB SPN 암호 — 정적 매개변수 추출(0xFun 2026)](#spectre-rsb-spn-암호--정적-매개변수-추출0xfun-2026)
+- [부드러움을 통한 이미지 XOR 마스크 복구(VuwCTF 2025)](#부드러움을-통한-이미지-xor-마스크-복구vuwctf-2025)
+- [mmap RWX(VuwCTF 2025)를 통한 데이터 섹션의 쉘코드](#mmap-rwxvuwctf-2025를-통한-데이터-섹션의-쉘코드)
+- [재귀 execve 빼기(VuwCTF 2025)](#재귀-execve-빼기vuwctf-2025)
+- [한 번에 바이트 블록 암호화 공격(UTCTF 2024)](#한-번에-바이트-블록-암호화-공격utctf-2024)
+- [수학적 융합 비트맵(EHAX 2026)](#수학적-융합-비트맵ehax-2026)
+- [Windows PE XOR 비트맵 추출 + OCR(srdnlenCTF 2026)](#windows-pe-xor-비트맵-추출--ocrsrdnlenctf-2026)
+- [2단계 로더: RC4 Gate + VM 제약 조건(srdnlenCTF 2026)](#2단계-로더-rc4-gate--vm-제약-조건srdnlenctf-2026)
+- [커널 모듈 미로 해결(DiceCTF 2026)](#커널-모듈-미로-해결dicectf-2026)
+- [채널 동기화 기능을 갖춘 다중 스레드 VM(DiceCTF 2026)](#채널-동기화-기능을-갖춘-다중-스레드-vmdicectf-2026)
+- [문자열 비교를 통한 백도어 공유 라이브러리 탐지(Hack.lu CTF 2012)](#문자열-비교를-통한-백도어-공유-라이브러리-탐지hacklu-ctf-2012)
+- [RC4 플랫 바이너리가 포함된 사용자 정의 binfmt 커널 모듈(BSidesSF 2026)](#rc4-플랫-바이너리가-포함된-사용자-정의-binfmt-커널-모듈bsidessf-2026)
+- [해시 해결된 가져오기/가져오기 불가 랜섬웨어(BSidesSF 2026)](#해시-해결된-가져오기가져오기-불가-랜섬웨어bsidessf-2026)
+- [ELF 분석 방지를 위한 섹션 헤더 손상(BSidesSF 2026)](#elf-분석-방지를-위한-섹션-헤더-손상bsidessf-2026)
 
 ---
 
@@ -279,7 +279,7 @@ void dfs(int fd, int x, int y, int z) {
 
     int walls = ioctl_get_walls(fd);
     int dx[] = {1,-1,0,0,0,0}, dy[] = {0,0,1,-1,0,0}, dz[] = {0,0,0,0,1,-1};
-    int opp[] = {2,3,0,1,5,4};  // opposite directions for backtracking
+    int opp[] = {1,0,3,2,5,4};  // opposite directions for the dx/dy/dz order above
 
     for (int dir = 0; dir < 6; dir++) {
         if (!(walls & (1 << dir))) continue;  // wall present
@@ -291,7 +291,7 @@ void dfs(int fd, int x, int y, int z) {
 // After decoy hit: reset via ioctl 0x6489, clear visited, re-run DFS
 ```
 
-**원격 배포:** netcat 셸을 통해 base64 청크를 통해 바이너리를 업로드하고, 디코딩하고, 실행합니다.
+**원격 배포:** 소유하거나 명시적으로 허가받은 CTF 인스턴스에서만 제공된 셸을 사용해 솔버를 업로드·실행합니다.
 
 **주요 통찰:** 커널 모듈 문제의 경우 initramfs에 테스트 바이너리를 삽입하고 ioctl을 동적으로 검색하는 것이 제거된 커널 모듈의 정적 RE보다 빠릅니다. 빠른 업로드를 위해 솔버 바이너리를 최소화하십시오(원시 시스템 호출, libc 없음).
 
@@ -343,11 +343,12 @@ def solve_flag(scramble_vals, lookup_table, initial_state, target_state):
 **패턴(Zombie Lockbox):** setuid 바이너리는 비밀번호 확인을 위해 `strcmp`를 사용합니다. 예상 비밀번호는 `strings`를 통해 볼 수 있고 GDB(suid 삭제)에서 작동하지만 정상적으로 실행되면 실패합니다. suid 상태에 따라 기능 동작을 패치하는 비표준 libc에 대한 바이너리 링크입니다.
 
 **Detection steps:**
-1. `ldd`를 사용하여 비표준 라이브러리 경로를 확인하세요.
+1. 먼저 실행하지 않는 `readelf -d` 또는 `objdump -p`로 의존성을 확인하세요. `ldd`는 신뢰한 바이너리에만 사용합니다.
 ```bash
-ldd ./binary
-# Suspicious: libc.so.6 => /lib/libc/libc.so.6  (non-standard path)
-# Normal:    libc.so.6 => /lib32/libc.so.6
+readelf -d ./binary | grep -E 'NEEDED|RPATH|RUNPATH'
+objdump -p ./binary | grep -E 'NEEDED|RPATH|RUNPATH'
+# Suspicious: RUNPATH/RPATH points at an unexpected bundled directory.
+# Resolve the exact runtime path only inside the disposable analysis VM.
 ```
 
 2. 의심스러운 libc와 시스템 libc 사이의 문자열 비교:
@@ -358,7 +359,7 @@ diff suspicious_strings normal_strings
 ```
 
 3. 패치된 함수(예: `puts`)를 분해하여 삽입된 코드를 찾습니다.
-```bash
+```text
 gdb /lib/libc/libc.so.6
 (gdb) disas puts
 # Look for unexpected calls or branches
@@ -435,14 +436,24 @@ decrypted = cipher.decrypt(encrypted)
 #include <openssl/evp.h>
 #include <stdio.h>
 
+static void dump_bytes(const char *path, const unsigned char *buf, int len) {
+    FILE *f = fopen(path, "wb");
+    if (f) {
+        fwrite(buf, 1, (size_t)len, f);
+        fclose(f);
+    }
+}
+
 int EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
                        ENGINE *impl, const unsigned char *key,
                        const unsigned char *iv) {
-    if (key) {
-        FILE *f = fopen("/tmp/aes_key.bin", "wb");
-        fwrite(key, 1, 32, f);  // AES-256
-        fclose(f);
-        fprintf(stderr, "[HOOK] AES key captured\n");
+    if (type && key) {
+        dump_bytes("/tmp/aes_key.bin", key, EVP_CIPHER_key_length(type));
+        fprintf(stderr, "[HOOK] cipher key captured\n");
+    }
+    if (type && iv && EVP_CIPHER_iv_length(type) > 0) {
+        dump_bytes("/tmp/aes_iv.bin", iv, EVP_CIPHER_iv_length(type));
+        fprintf(stderr, "[HOOK] cipher IV captured\n");
     }
     typedef int (*orig_t)(EVP_CIPHER_CTX*, const EVP_CIPHER*, ENGINE*,
                           const unsigned char*, const unsigned char*);
@@ -454,8 +465,11 @@ int EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
 ```bash
 # Compile and run
 gcc -shared -fPIC -o hook.so hook_crypto.c -ldl
-# Run in Docker container (ransomware may be destructive!)
-docker run --rm -v $(pwd):/work -w /work ubuntu:22.04 \
+# Disposable, network-isolated container. The sample directory is read-only;
+# Docker still shares the host kernel and is not a hardened malware sandbox.
+docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges \
+  --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m --user 65534:65534 \
+  -v "$(pwd):/work:ro" -w /work ubuntu:22.04 \
   bash -c "LD_PRELOAD=./hook.so ./ransomware; xxd /tmp/aes_key.bin"
 ```
 
@@ -467,22 +481,24 @@ docker run --rm -v $(pwd):/work -w /work ubuntu:22.04 \
 **키 캡처 후 암호 해독:**
 ```python
 from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 
 key = open('/tmp/aes_key.bin', 'rb').read()
-iv = open('/tmp/aes_iv.bin', 'rb').read()  # Also hookable
+iv = open('/tmp/aes_iv.bin', 'rb').read()
+if len(key) != 32 or len(iv) != AES.block_size:
+    raise ValueError("this example expects AES-256-CBC; verify the captured cipher")
 cipher = AES.new(key, AES.MODE_CBC, iv)
 
 with open('flag.txt.enc', 'rb') as f:
     ct = f.read()
 pt = cipher.decrypt(ct)
-# Remove PKCS7 padding
-pt = pt[:-pt[-1]]
+pt = unpad(pt, AES.block_size)
 print(pt.decode())
 ```
 
-**주요 통찰력:** 바이너리가 해싱을 통해 모든 가져오기를 해결할 때 해시 함수를 역전시키고 레인보우 테이블을 구축하는 데 시간을 낭비하지 마십시오. 대신, 관심 있는 기능(OpenSSL 암호화 기능, 파일 I/O, 네트워크 호출)에 대한 `LD_PRELOAD` 후크가 있는 샌드박스 환경에서 악성코드를 실행하여 모든 것을 자체적으로 해결하도록 하세요. AES 키는 실행 전반에 걸쳐 결정적입니다. 즉, 한 번 작동하면 항상 작동합니다.
+**주요 통찰력:** 바이너리가 해싱을 통해 가져오기를 해결하는 경우, 격리된 동적 분석에서 관심 있는 OpenSSL 호출의 실제 키·IV·cipher를 기록하면 이름 해시 전체를 먼저 역산하지 않고도 이 사례를 분석할 수 있습니다. 키가 실행·파일·세션마다 재생성될 수 있으므로 한 번 캡처한 값이 다른 실행에도 유효하다고 가정하지 마세요.
 
-**안전:** 의심되는 랜섬웨어는 항상 Docker 컨테이너나 VM에서 실행하세요. 암호화된 파일의 복사본만 마운트하고 원본은 마운트하지 마세요.
+**안전:** 의심되는 랜섬웨어는 비밀·공유 폴더·외부 네트워크가 없는 폐기 가능한 VM에서 실행하는 것이 기본입니다. 컨테이너는 호스트 커널을 공유하므로 완전한 악성코드 경계가 아니며 추가 방어층으로만 사용하세요. 암호화 테스트용 복사본만 노출하고 원본은 마운트하지 마세요.
 
 **참고 자료:** BSidesSF 2026 "Ran Somewhere"
 
@@ -515,12 +531,19 @@ if idx >= 0:
 
 **Recovery approach:**
 ```bash
-# Patch section header offset to 0 (removes section table)
-printf '\x00\x00\x00\x00\x00\x00\x00\x00' | dd of=binary bs=1 seek=40 conv=notrunc
+# ELF64 only: e_shoff is at file offset 40. ELF32 uses offset 32;
+# verify EI_CLASS first and patch a copy, not the original.
+set -e
+LC_ALL=C readelf -h stubborn_elf | grep -q 'Class:.*ELF64' || { echo "ELF64 input required" >&2; exit 1; }
+cp stubborn_elf repaired_elf
+printf '\x00\x00\x00\x00\x00\x00\x00\x00' | dd of=repaired_elf bs=1 seek=40 conv=notrunc
+# e_shnum (offset 60) and e_shstrndx (offset 62) must also be zero.
+printf '\x00\x00\x00\x00' | dd of=repaired_elf bs=1 seek=60 conv=notrunc
+LC_ALL=C readelf -h repaired_elf | grep -E 'Start of section headers|Number of section headers|Section header string table index'
 # Now Ghidra/IDA can load it using program headers only
 
 # Or use readelf -l (program headers only, ignores sections)
-readelf -l stubborn_elf
+readelf -l repaired_elf
 ```
 
 **인식해야 할 경우:** `readelf -S` 충돌이 발생하거나 쓰레기가 표시됩니다. `file` 명령은 이를 ELF로 식별합니다. `readelf -l`(소문자 L, 프로그램 헤더)는 정상적으로 작동합니다. 도구 오류에도 불구하고 바이너리가 정상적으로 실행됩니다.

@@ -8,6 +8,8 @@
 
 ### 파일 헤더(ELF 헤더)
 
+아래 고정 오프셋과 8바이트 필드는 **ELF64** 기준입니다. ELF32에서는 `e_entry/e_phoff/e_shoff`가 각각 `0x18/0x1c/0x20`의 4바이트 필드이고, `e_phnum/e_shnum`은 `0x2c/0x30`에 있습니다. 먼저 `EI_CLASS`를 확인하세요.
+
 ```text
 오프셋 크기 필드 설명
 0x00  4    e_ident[EI_MAG]   Magic: 7f 45 4c 46 ("\x7fELF")
@@ -28,7 +30,7 @@
 유형 값 이름 설명
 0x01 PT_LOAD 로드 가능 세그먼트(코드/데이터)
 0x02 PT_DYNAMIC 동적 링크 정보
-0x03 PT_INTERP 인터프리터 경로(/lib/ld-linux.so)
+0x03 PT_INTERP 인터프리터 경로(경로는 아키텍처와 배포판에 따라 다름)
 0x04 PT_NOTE 보조 정보
 0x06 PT_PHDR 프로그램 헤더 테이블 자체
 0x6474e550 PT_GNU_EH_FRAME 예외 처리
@@ -74,7 +76,7 @@
 
 ```text
 특징:
-1. 진입점 근처에 mmap(PROT_READ|PROT_WRITE|PROT_EXEC) 호출이 있습니다.
+1. 진입점 근처에 `mmap` 호출이 있습니다. 흔한 W^X 흐름은 RW 매핑 후 RX로 바꾸는 방식이며, RWX 매핑을 직접 요청하는 변형도 있습니다.
 2. memcpy 또는 순환 복사가 이어집니다.
 3. 그런 다음 mprotect를 사용하여 권한을 변경합니다.
 4. 마지막으로 새로 매핑된 주소로 br/jmp
@@ -95,7 +97,7 @@
 | 등록하다| 목적|
 |--------|------|
 | x0-x7 | 매개변수/반환 값|
-| x8 | 간접 결과(syscall 번호)|
+| x8 | ABI의 간접 결과 위치 레지스터; Linux `svc` 호출 직전에는 syscall 번호|
 | x9-x15 | 임시등록부|
 | x16-x17 | IP0/IP1(PLT 점프)|
 | x18 | 플랫폼 레지스터(Android: 섀도우 콜 스택)|
@@ -172,7 +174,8 @@ b.eq 라벨 # 점프와 동일
 2. "슬라이딩 윈도우" 카피백(출력 버퍼에서 다시 읽기)이 있습니다 → LZ 시리즈
 3. 빈도표/허프만 트리 구성 → Deflate/Huffman
 4. 고정된 크기의 블록 처리 → 블록 압축(LZ4/Snappy)이 있습니다.
-5. 산술부호화 특성(간격 축소) 있음 → LZMA/ANS
+5. 산술/범위 부호화 특성(간격 축소) 있음 → LZMA 등의 range coder
+6. 정규화된 빈도 상태 전이와 테이블 조회 → ANS 계열(산술 부호화와는 별도 방식)
 ```
 
 ---
@@ -202,9 +205,10 @@ b.eq 라벨 # 점프와 동일
 1. ptrace(PTRACE_ATTACH, target_pid)
 2. waitpid(target_pid)
 3. ptrace(PTRACE_GETREGS, target_pid, &regs)
-4. 삽입된 코드를 가리키도록 regs.pc를 수정합니다.
-5. ptrace(PTRACE_SETREGS, target_pid, &regs)
-6. ptrace(PTRACE_CONT, target_pid)
+4. `PTRACE_POKEDATA`, `process_vm_writev`, 또는 `/proc/<pid>/mem`으로 대상 주소에 페이로드를 씁니다.
+5. 삽입된 코드를 가리키도록 아키텍처별 PC 레지스터를 수정합니다.
+6. ptrace(PTRACE_SETREGS, target_pid, &regs)
+7. ptrace(PTRACE_CONT, target_pid)
 
 특징:
 - /proc/<pid>/mem을 열거나 ptrace를 사용하세요.
@@ -221,7 +225,7 @@ b.eq 라벨 # 점프와 동일
 3. write(fd, new_code, size)
 
 목적:
-- W^X 보호 우회(mmap 페이지는 동시에 W+X일 수 없음)
+- 커널·LSM·프로세스 권한 정책이 허용하는 경우 기존 매핑을 파일 인터페이스로 수정; 이것만으로 모든 W^X 정책을 우회하는 것은 아님
 - 자체 코드 세그먼트 수정(.text는 일반적으로 읽기 전용임)
 - 런타임 패치 명령
 ```
@@ -242,7 +246,7 @@ b.eq 라벨 # 점프와 동일
 2. 구조 분석(10분)
    - readelf -l → 프로그램 헤더(LOAD 섹션 레이아웃)
    - 진입점 근처의 코드 → 압축해제/복호화 여부
--.init_array → 생성자 찾기(아마도 디버깅 방지 기능 포함)
+   - `.init_array` → 생성자 찾기(디버깅 방지 기능이 포함될 수 있음)
 
 3. 위치 키 로직
    - 문자열 상호 참조로 시작
@@ -280,17 +284,13 @@ aarch64-linux-gnu-objdump -d binary  # ARM64 교차 분해
 # 동적 분석
 strace -f ./binary         # 시스템 호출 추적
 ltrace -f ./binary         # 라이브러리 함수 추적
-qemu-aarch64 -strace ./binary  # ARM64 에뮬레이트 실행
+qemu-aarch64 -L /path/to/aarch64-sysroot -strace ./dynamic-binary
+# 정적 링크 바이너리는 보통 -L 없이 실행 가능
 
 # 메모리 덤프
 gdb -p <pid> -ex "dump memory out.bin 0xADDR 0xADDR+SIZE" -ex quit
 
-# 고장난 수리 ELF
-# e_phnum을 수동으로 수정하거나 손상된 PHDR을 패치하세요.
-python -c "
-import struct
-with open('binary', 'r+b') as f:
-    f.seek(0x38)  # e_phnum offset (64-bit)
-    f.write(struct.pack('<H', 2))  # PHDR 수량을 수정하도록 수정됨
-"
+# 손상된 ELF는 먼저 복사본에서 EI_CLASS와 실제 PHDR 경계를 확인하세요.
+# e_phnum을 임의의 상수로 쓰지 말고, 살아 있는 프로그램 헤더와 파일 크기에서
+# 검증한 개수를 사용해 LIEF/pyelftools 등으로 복구하세요.
 ```

@@ -1,25 +1,25 @@
-# CTF 역방향 - 플랫폼별 역방향
+# CTF 리버스 - 플랫폼별 리버싱
 
 macOS/iOS, embedded/IoT 펌웨어, 커널 드라이버 및 자동차 리버스 엔지니어링.
 
 ## 목차
-- [macOS / iOS 반전](#macos--ios-reversing)
-  - [Mach-O 바이너리 형식](#mach-o-binary-format)
-  - [코드 서명 및 권한](#code-signing--entitlements)
-  - [Objective-C 런타임 RE](#objective-c-runtime-re)
-  - [Swift 바이너리 역전](#swift-binary-reversing)
-  - [iOS 앱 분석](#ios-app-analytic)
-  - [dyld / 동적 연결](#dyld--dynamic-linking)
-- [내장형/IoT 펌웨어 RE](#임베디드--iot-firmware-re)
-  - [펌웨어 추출](#firmware-extraction)
-  - [펌웨어 언패킹](#firmware-unpacking)
-  - [아키텍처 관련 참고 사항](#architecture-special-notes)
-  - [RTOS 분석](#rtos-analytic)
-- [커널 드라이버 반전](#kernel-driver-reversing)
-  - [Linux 커널 모듈](#linux-kernel-modules)
-  - [eBPF 프로그램](#ebpf-프로그램)
-  - [Windows 커널 드라이버](#windows-kernel-drivers)
-- [자동차 / CAN 버스 RE](#automotive--can-bus-re)
+- [macOS / iOS 반전](#macos--ios-반전)
+  - [Mach-O 바이너리 형식](#mach-o-바이너리-형식)
+  - [코드 서명 및 권한](#코드-서명-및-권한)
+  - [Objective-C 런타임 RE](#objective-c-런타임-re)
+  - [Swift 바이너리 리버싱](#swift-바이너리-리버싱)
+  - [iOS 앱 분석](#ios-앱-분석)
+  - [dyld / 동적 연결](#dyld--동적-연결)
+- [임베디드/IoT 펌웨어 RE](#임베디드iot-펌웨어-re)
+  - [Firmware Extraction](#firmware-extraction)
+  - [Firmware Unpacking](#firmware-unpacking)
+  - [Architecture-Specific Notes](#architecture-specific-notes)
+  - [RTOS Analysis](#rtos-analysis)
+- [커널 드라이버 반전](#커널-드라이버-반전)
+  - [Linux 커널 모듈](#linux-커널-모듈)
+  - [eBPF Programs](#ebpf-programs)
+  - [Windows 커널 드라이버](#windows-커널-드라이버)
+- [자동차/CAN 버스 RE](#자동차can-버스-re)
 
 ---
 
@@ -71,9 +71,9 @@ codesign -f -s - binary
 
 **CTF 관련성:** 패치된 바이너리를 macOS에서 실행하려면 다시 서명해야 합니다. 임시 서명(`-s -`)은 로컬 테스트에 적합합니다.
 
-### 목표-C 런타임 RE
+### Objective-C 런타임 RE
 
-```bash
+```text
 # Dump Objective-C class info
 class-dump binary > classes.h
 # Shows: @interface, @protocol, method signatures with types
@@ -89,7 +89,9 @@ class-dump binary > classes.h
 **분해된 Objective-C:**
 ```text
 # objc_msgSend(receiver, selector, ...) is THE dispatch mechanism
-# RDI = self (receiver), RSI = selector (char* method name)
+# x86-64: RDI=self, RSI=_cmd. arm64: x0=self, x1=_cmd.
+# The selector is a SEL token, not a C string pointer, though its name is
+# represented in Objective-C metadata.
 
 # In Ghidra/IDA, look for:
 objc_msgSend(obj, "checkPassword:", input)
@@ -102,7 +104,7 @@ objc_msgSend(obj, "checkPassword:", input)
 - `otool -oV binary` — Objective-C 세그먼트 덤프
 - Ghidra: 분석 옵션에서 "Objective-C" 분석기를 활성화합니다.
 
-### 신속한 바이너리 역전
+### Swift 바이너리 리버싱
 
 ```bash
 # Detect Swift
@@ -110,13 +112,13 @@ strings binary | grep "swift"
 otool -l binary | grep "swift"   # __swift5_* sections
 
 # Swift demangling
-swift demangle 's14MyApp0A8ClassC10checkInput6resultSbSS_tF'
+swift demangle '$s14MyApp0A8ClassC10checkInput6resultSbSS_tF'
 # → MyApp.MyAppClass.checkInput(result: String) -> Bool
 
 # xcrun swift-demangle < mangled_names.txt
 ```
 
-**신속한 분해:**
+**Swift 분해:**
 ```text
 # Swift uses value witness tables (VWT) for type operations
 # Protocol witness tables (PWT) for dynamic dispatch (like vtables)
@@ -127,12 +129,9 @@ swift_release             → reference count decrement
 swift_bridgeObjectRetain  → bridged (ObjC ↔ Swift) retain
 swift_once                → lazy initialization (like dispatch_once)
 
-# String layout:
-# Small strings (≤15 bytes): inline in 16-byte buffer, tagged pointer
-# Large strings: heap-allocated, pointer + length + flags
-
-# Array<T>: pointer to ContiguousArrayStorage (header + elements)
-# Dictionary<K,V>: hash table with open addressing
+# String/Array/Dictionary representations are implementation details that can
+# change across Swift runtime versions. Use metadata, witness operations, and
+# observed accesses instead of imposing a fixed field layout.
 ```
 
 **Ghidra Swift의 경우:** "Swift" 언어 모듈을 활성화합니다. Swift 메타데이터 섹션(`__swift5_types`, `__swift5_proto`)에는 Ghidra가 구문 분석할 수 있는 유형 설명자가 포함되어 있습니다.
@@ -168,9 +167,9 @@ class-dump decrypted_binary > headers.h
 // Frida bypass:
 var paths = ["/Applications/Cydia.app", "/bin/sh", "/etc/apt",
              "/private/var/lib/apt", "/usr/bin/ssh"];
-Interceptor.attach(Module.findExportByName(null, "access"), {
+Interceptor.attach(Module.getGlobalExportByName("access"), {
     onEnter(args) {
-        this.path = Memory.readUtf8String(args[0]);
+        this.path = args[0].readUtf8String();
     },
     onLeave(retval) {
         if (paths.some(p => this.path && this.path.includes(p))) {
@@ -212,6 +211,8 @@ hexdump -C firmware.bin | grep "UBI#"       # UBI magic
 ```
 
 **하드웨어 추출 방법(물리적 접근):**
+먼저 보드 전원을 분리하고 핀 전압·logic level·ground를 측정하세요. 어댑터의 VCC를 무작정 연결하지 말고, 가능한 경우 read-only·저속 캡처로 시작하며 원본 flash의 검증된 복사본을 보존하세요. 실제 장치 작업은 소유·허가 범위와 전기 안전 절차 안에서 수행합니다.
+
 ```text
 UART:  Serial console — often gives root shell or bootloader access
        Tools: USB-UART adapter, baudrate detection (usually 115200)
@@ -267,12 +268,12 @@ qemu-arm -L /usr/arm-linux-gnueabihf/ ./arm_binary
 qemu-arm -g 1234 ./arm_binary    # Start GDB server on port 1234
 gdb-multiarch -ex 'target remote :1234' ./arm_binary
 
-# ARM vs Thumb: ARM instructions are 4 bytes, Thumb are 2 bytes
+# ARM instructions are 4 bytes; Thumb instructions may be 16 or 32 bits
 # LSB of function pointer indicates mode: 0=ARM, 1=Thumb
 # Ghidra: Right-click → Processor Options → ARM/Thumb mode
 ```
 
-**ARM64/AArch64:** AArch64 호출 규칙, ROP 가젯 및 qemu-aarch64-static 에뮬레이션은 [platforms-hardware.md](platforms-hardware.md#arm64aarch64-reversing-and-exploitation)을 참조하세요.
+**ARM64/AArch64:** AArch64 호출 규칙, ROP 가젯 및 qemu-aarch64-static 에뮬레이션은 [platforms-hardware.md](platforms-hardware.md#arm64aarch64-반전-및-착취)을 참조하세요.
 
 **MIPS(라우터, 내장형):**
 ```bash
@@ -284,12 +285,13 @@ qemu-mips -L /usr/mips-linux-gnu/ ./mips_binary         # Big-endian
 qemu-mipsel -L /usr/mipsel-linux-gnu/ ./mipsel_binary   # Little-endian
 
 # Key MIPS patterns:
-# Branch delay slots — instruction AFTER branch always executes
+# Pre-Release-6 MIPS commonly has a delay-slot instruction; branch-likely and
+# annul semantics need separate handling, and MIPS Release 6 removed delay slots.
 # $gp (global pointer) — used for PIC, points to .got
 # lui + addiu pair — loads 32-bit constant (upper 16 + lower 16)
 ```
 
-**RISC-V:** 캡스톤 분해에 대해서는 메인 [tools.md](tools.md#risc-v-binary-analytic-ehax-2026)을 참조하고 고급 확장 및 디버깅에 대해서는 [platforms-hardware.md](platforms-hardware.md#risc-v-advanced)를 참조하세요.
+**RISC-V:** 캡스톤 분해에 대해서는 메인 [tools.md](tools.md#risc-v-이진-분석ehax-2026)을 참조하고 고급 확장 및 디버깅에 대해서는 [platforms-hardware.md](platforms-hardware.md#risc-v-advanced)를 참조하세요.
 
 ### RTOS Analysis
 
@@ -323,7 +325,7 @@ file module.ko                      # "ELF 64-bit LSB relocatable"
 modinfo module.ko                   # Module info (description, author, license)
 
 # List module symbols
-nm module.ko | grep -v " U "       # Exported symbols
+nm module.ko | grep -v " U "       # Symbols defined in the module (not all exported)
 
 # Strings for quick recon
 strings module.ko | grep -i "flag\|secret\|ioctl\|device"
@@ -334,7 +336,8 @@ strings module.ko | grep -i "flag\|secret\|ioctl\|device"
 
 # Load in Ghidra
 # Language: x86:LE:64:default
-# Base address: doesn't matter for .ko (relocatable)
+# Choose a consistent analysis base; runtime addresses require applying the
+# module's relocations and actual load base.
 # Look for init_module / cleanup_module entry points
 ```
 
@@ -358,7 +361,7 @@ copy_to_user((void __user *)arg, kernel_buf, size);
 ```
 
 **커널 모듈 디버깅:**
-```bash
+```text
 # QEMU + GDB for kernel debugging
 qemu-system-x86_64 -kernel bzImage -initrd initrd.cpio -s -S \
   -append "console=ttyS0 nokaslr" -nographic
@@ -375,13 +378,14 @@ gdb vmlinux
 ```bash
 # Dump eBPF programs from running system
 bpftool prog list
-bpftool prog dump xlated id <N>    # Disassemble
-bpftool prog dump jited id <N>     # JIT'd machine code
+PROGRAM_ID=42  # 검토할 실제 프로그램 ID로 교체
+bpftool prog dump xlated id "$PROGRAM_ID"    # Disassemble
+bpftool prog dump jited id "$PROGRAM_ID"     # JIT'd machine code
 
 # eBPF bytecode analysis
 # eBPF has 11 registers (r0-r10), 64-bit
 # r0 = return value, r1-r5 = arguments, r10 = frame pointer
-# Instructions are 8 bytes each
+# Most eBPF instructions are 8 bytes; LDDW (64-bit immediate load) occupies 16.
 
 # Disassemble .o file containing eBPF
 llvm-objdump -d ebpf_prog.o
@@ -411,6 +415,8 @@ llvm-objdump -d ebpf_prog.o
 
 ## 자동차/CAN 버스 RE
 
+실제 차량/산업용 버스에서는 아래 송신·재생 명령을 사용하지 말고, 소유하거나 명시적으로 허가받은 전원 제한 격리 벤치와 virtual CAN에서 먼저 검증하세요. 잘못된 프레임은 물리 장치 동작과 안전에 영향을 줄 수 있습니다.
+
 ```bash
 # CAN bus interface setup
 sudo ip link set can0 type can bitrate 500000
@@ -432,11 +438,12 @@ cansend can0 7DF#0201000000000000          # Send single frame (OBD-II request)
 
 # Decode CAN frames
 # ID: 11-bit or 29-bit identifier
-# DLC: Data Length Code (0-8 bytes)
-# Data: up to 8 bytes payload
+# Classic CAN: DLC encodes 0-8 payload bytes.
+# CAN FD supports payloads up to 64 bytes with a nonlinear DLC mapping above 8.
 ```
 
 **CTF 자동차 패턴:**
+
 - 시드 키 바이패스: ECU 펌웨어에서 키 파생 알고리즘을 역전시킵니다.
 - CAN 메시지 재생: 합법적인 명령 캡처, 재생을 통해 기능 잠금 해제
 - UDS/KWP2000를 통해 ECU에서 펌웨어 추출

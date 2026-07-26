@@ -3,15 +3,15 @@
 HD44780 LCD GPIO 재구성, RISC-V 고급 확장 및 디버깅, ARM64/AArch64 반전 및 활용.
 
 ## 목차
-- [HD44780 LCD 컨트롤러 GPIO 재구성(32C3 2015)](#hd44780-lcd-controller-gpio-reconstruction-32c3-2015)
-- [RISC-V(고급)](#risc-v-advanced)
-  - [사용자 정의 확장](#custom-extensions)
-  - [권한 모드](#privileged-modes)
-  - [RISC-V 디버깅](#risc-v-debugging)
-- [ARM64/AArch64 반전 및 악용](#arm64aarch64-reversing-and-exploitation)
-- [MIPS64 Cavium OCTEON 보조 프로세서 2 암호화(SEC-T CTF 2017)](#mips64-cavium-octeon-coprocessor-2-crypto-sec-t-ctf-2017)
-- [EFM32 ARM 마이크로컨트롤러 MMIO AES(SEC-T CTF 2017)](#efm32-arm-microcontroller-mmio-aes-sec-t-ctf-2017)
-- [MBR/Bootloader QEMU + GDB로 반전(Square CTF 2017)](#mbrbootloader-reversing-with-qemu--gdb-square-ctf-2017)
+- [HD44780 LCD 컨트롤러 GPIO 재구성(32C3 2015)](#hd44780-lcd-컨트롤러-gpio-재구성32c3-2015)
+- [RISC-V (Advanced)](#risc-v-advanced)
+  - [Custom Extensions](#custom-extensions)
+  - [Privileged Modes](#privileged-modes)
+  - [RISC-V Debugging](#risc-v-debugging)
+- [ARM64/AArch64 반전 및 착취](#arm64aarch64-반전-및-착취)
+- [MIPS64 Cavium OCTEON 보조 프로세서 2 암호화(SEC-T CTF 2017)](#mips64-cavium-octeon-보조-프로세서-2-암호화sec-t-ctf-2017)
+- [EFM32 ARM 마이크로컨트롤러 MMIO AES(SEC-T CTF 2017)](#efm32-arm-마이크로컨트롤러-mmio-aessec-t-ctf-2017)
+- [MBR/Bootloader QEMU + GDB로 반전(Square CTF 2017)](#mbrbootloader-qemu--gdb로-반전square-ctf-2017)
 
 ---
 
@@ -19,10 +19,10 @@ HD44780 LCD GPIO 재구성, RISC-V 고급 확장 및 디버깅, ARM64/AArch64 �
 
 원시 Raspberry Pi GPIO 녹음에서 HD44780 LCD에 표시된 텍스트를 복구합니다.
 
-1. **신호 라인 식별:** GPIO 핀을 HD44780 신호(4비트 모드의 경우 RS, CLK, D4-D7)에 매핑
-2. **클럭 에지 감지:** 하강 클록 에지의 샘플 데이터 라인(1->0 전환)
+1. **신호 라인 식별:** GPIO 핀을 HD44780 신호(4비트 모드의 경우 RS, E, D4-D7)에 매핑
+2. **Enable 에지 감지:** E의 하강 에지에서 데이터 라인을 샘플링
 3. **니블 어셈블리:** 두 개의 4비트 샘플을 하나의 8비트 command/data 바이트로 결합합니다.
-4. **DRAM 주소 매핑:** HD44780은 다중 라인 디스플레이에 비연속 주소 지정을 사용합니다.
+4. **DDRAM 주소 매핑:** HD44780은 다중 라인 디스플레이에 비연속 주소 지정을 사용합니다. 아래는 흔한 20x4 모듈 매핑이며 모듈 기하에 따라 확인해야 합니다.
    - Line 0: 0x00-0x27
    - Line 1: 0x40-0x67
    - Line 2: 0x14-0x3B
@@ -33,7 +33,7 @@ display = [' '] * 80  # 4 lines x 20 chars
 cursor = 0
 
 for timestamp, gpio_state in sorted(gpio_log):
-    if falling_edge(gpio_state, CLK_PIN):
+    if falling_edge(gpio_state, E_PIN):
         nibble = extract_data_bits(gpio_state)
         byte = assemble_nibble(nibble)  # Two nibbles per byte
         if rs_high(gpio_state):  # RS=1: data write
@@ -43,13 +43,13 @@ for timestamp, gpio_state in sorted(gpio_log):
             cursor = parse_command(byte)
 ```
 
-**주요 통찰력:** GPIO 핀-신호 매핑은 거의 문서화되지 않습니다. 가장 많은 전환이 있는 핀을 찾아서 CLK를 식별하고, RS는 데이터 패턴(command/data 위상 교대)과의 상관 관계를 통해 식별합니다.
+**주요 통찰력:** GPIO 핀-신호 매핑은 거의 문서화되지 않습니다. 짧은 펄스가 반복되는 핀에서 E를 식별하고, RS는 데이터 패턴(command/data 위상 교대)과의 상관 관계를 통해 식별합니다.
 
 ---
 
 ## RISC-V (Advanced)
 
-기본적인 분해를 넘어([tools.md](tools.md#risc-v-binary-analytic-ehax-2026) 참조):
+기본적인 분해를 넘어([tools.md](tools.md#risc-v-이진-분석ehax-2026) 참조):
 
 ### Custom Extensions
 
@@ -84,7 +84,7 @@ CSR registers to watch:
 
 ### RISC-V Debugging
 
-```bash
+```text
 # OpenOCD + GDB for hardware debugging
 openocd -f interface/jlink.cfg -f target/riscv.cfg
 
@@ -114,7 +114,7 @@ qemu-aarch64-static -L /usr/aarch64-linux-gnu/ ./arm64_binary
 
 # Debug with GDB
 qemu-aarch64-static -g 12345 -L /usr/aarch64-linux-gnu/ ./arm64_binary &
-gdb-multiarch -ex 'set arch aarch64' -ex 'target remote :1234' ./arm64_binary
+gdb-multiarch -ex 'set arch aarch64' -ex 'target remote :12345' ./arm64_binary
 
 # With library preloading (for challenges that ship libc)
 qemu-aarch64-static -g 12345 -E LD_PRELOAD=./libc.so.6 -L ./lib ./arm64_binary
@@ -124,7 +124,8 @@ qemu-aarch64-static -g 12345 -E LD_PRELOAD=./libc.so.6 -L ./lib ./arm64_binary
 
 ```text
 Registers:
-  x0-x7    -- function arguments AND return values (x0 = first arg / return)
+  x0-x7    -- integer/pointer arguments; common scalar return is x0, with x1
+              used for some multi-register results (FP/SIMD results use v0...)
   x8       -- indirect result location (struct returns)
   x9-x15   -- caller-saved temporaries
   x19-x28  -- callee-saved (preserved across calls)
@@ -134,8 +135,8 @@ Registers:
   xzr      -- zero register (reads as 0, writes discarded)
 
 Key exploitation differences:
-  - Return address in LR (x30), not on stack -- pushed only if function calls others
-  - No RIP-relative addressing like x86 -- uses ADRP+ADD pairs for PC-relative loads
+  - Return address starts in LR (x30); a function spills it to the stack when needed, commonly in non-leaf prologues
+  - PC-relative addressing exists through ADR/ADRP and literal loads; ADRP+ADD is a common page-relative pair
   - Fixed 4-byte instruction width -- no variable-length gadget tricks
   - NOP = 0xD503201F (not 0x90)
   - BLR x8 / BR x30 -- indirect calls/jumps use register operands
@@ -226,7 +227,7 @@ dmtc2  rN, 0x0105   ; ...next quadword
 
 ## EFM32 ARM 마이크로컨트롤러 MMIO AES(SEC-T CTF 2017)
 
-Silicon Labs EFM32 Cortex-M 바이너리 — Thumb 모드에서 0x1000에 로드되는 플랫 바이너리입니다.
+이 SEC-T 사례의 Silicon Labs EFM32 Cortex-M 플랫 바이너리는 Thumb 모드에서 0x1000에 로드됐습니다. 다른 EFM32 제품·이미지의 load address는 vector table과 메모리 맵에서 다시 확인하세요.
 
 **IDA setup:**
 ```text
@@ -235,7 +236,7 @@ Load address: 0x1000
 Set T register = 1 (force Thumb mode decoding)
 ```
 
-**AES 가속기 MMIO 레이아웃(0x400E0000의 EFM32 AES 주변 장치):**
+**이 대상에서 관찰한 AES 가속기 MMIO 레이아웃:** 아래 주소를 EFM32 전체 제품군의 공통값으로 사용하지 말고 정확한 part number의 reference manual 및 device header와 대조하세요.
 ```text
 0x400E0000 + 0x000  CTRL   – enable, decrypt mode
 0x400E0000 + 0x004  CMD    – start/stop
@@ -268,7 +269,7 @@ plaintext = cipher.decrypt(ciphertext)
 
 GDB 스텁이 활성화된 QEMU에서 floppy/disk 이미지를 부팅한 다음 16비트 리얼 모드 또는 32비트 보호 모드 부트로더 코드의 전체 소스 레벨 디버깅을 위해 GDB를 연결합니다.
 
-```bash
+```text
 # Boot with GDB stub on port 1234; -S pauses execution at start
 qemu-system-x86_64 -fda disk.img -s -S
 
@@ -287,14 +288,14 @@ gdb -ex "set architecture i8086" \
 
 비밀번호 확인을 우회하려면 비교 후 조건부 점프를 식별하고 이미지 파일에서 NOP을 적용하거나 항상 성공하도록 비교를 패치합니다.
 
-```bash
-# Find the comparison offset in the image and patch it
-python3 -c "
-data = open('disk.img', 'rb').read()
-# Replace JNZ (0x75) with JMP-short-always or NOP
-data = data[:offset] + b'\x90\x90' + data[offset+2:]
+```python
+# Use the verified *file offset*, not the runtime address. Keep disk.img intact.
+offset = 0x123  # replace with the offset established from this exact image
+data = bytearray(open('disk.img', 'rb').read())
+if not 0 <= offset < len(data) or data[offset] != 0x75:
+    raise ValueError("expected a short JNZ opcode at the verified offset")
+data[offset] = 0xEB  # short unconditional JMP; preserves the displacement byte
 open('disk_patched.img', 'wb').write(data)
-"
 ```
 
 **주요 통찰력:** QEMU의 `-s` 플래그는 MBR/bootloader 코드의 전체 디버깅을 위해 포트 1234에 GDB 스텁을 노출합니다. 워크플로는 사용자 영역 디버깅과 동일합니다.

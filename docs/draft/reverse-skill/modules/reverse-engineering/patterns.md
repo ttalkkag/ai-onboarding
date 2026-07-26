@@ -1,56 +1,56 @@
 # CTF 리버스 - 패턴 및 기술
 
 ## 목차
-- [커스텀 VM 반전](#custom-vm-reversing)
-  - [분석 단계](#analytic-steps)
-  - [공통 VM 패턴](#common-vm-patterns)
-  - [RVA 기반 Opcode 디스패칭](#rva-based-opcode-dispatching)
-  - [상태 머신 VM(90,000개 이상의 상태)](#state-machine-vms-90k-states)
-  - [퍼징 및 명령어 세트 검색을 통한 맞춤형 VM 리버스 엔지니어링(hxp CTF 2017)](#custom-vm-reverse-engineering-via-fuzzing-and-instruction-set-discovery-hxp-ctf-2017)
-- [디버깅 방지 기술](#anti-debugging-techniques)
-  - [공통점검](#common-checks)
-  - [우회 기법](#bypass-technique)
-  - [LD_PRELOAD 후크](#ld_preload-hook)
-  - [pwntools 바이너리 패치(Crypto-Cat)](#pwntools-binary-patching-crypto-cat)
+- [커스텀 VM 반전](#커스텀-vm-반전)
+  - [Analysis Steps](#analysis-steps)
+  - [일반적인 VM 패턴](#일반적인-vm-패턴)
+  - [RVA 기반 Opcode 디스패칭](#rva-기반-opcode-디스패칭)
+  - [상태 머신 VM(90,000개 이상의 상태)](#상태-머신-vm90000개-이상의-상태)
+  - [퍼징 및 명령어 세트 검색을 통한 맞춤형 VM 리버스 엔지니어링(hxp CTF 2017)](#퍼징-및-명령어-세트-검색을-통한-맞춤형-vm-리버스-엔지니어링hxp-ctf-2017)
+- [Anti-Debugging Techniques](#anti-debugging-techniques)
+  - [Common Checks](#common-checks)
+  - [Bypass Technique](#bypass-technique)
+  - [LD_PRELOAD Hook](#ld_preload-hook)
+  - [pwntools 바이너리 패치(Crypto-Cat)](#pwntools-바이너리-패치crypto-cat)
 - [Nanomites](#nanomites)
-  - [Linux(신호 기반)](#linux-신호 기반)
-  - [Windows(디버그 이벤트)](#windows-debug-events)
+  - [Linux (Signal-Based)](#linux-signal-based)
+  - [Windows(디버그 이벤트)](#windows디버그-이벤트)
   - [Analysis](#analysis)
-- [자체 수정 코드](#self-modifying-code)
-  - [패턴: XOR 복호화](#pattern-xor-decryption)
-- [Known-Plaintext XOR(플래그 접두사)](#known-plaintext-xor-flag-prefix)
-  - [변형: 위치 인덱스가 있는 XOR](#variant-xor-with-position-index)
-- [혼합 모드(x86-64 / x86) 스테이저](#mixed-mode-x86-64--x86-stagers)
-- [LLVM(저수준 가상 머신) 난독화(제어 흐름 평탄화)](#llvm-low-level-virtual-machine-obfuscation-control-flow-평탄화)
+- [Self-Modifying Code](#self-modifying-code)
+  - [패턴: XOR 복호화](#패턴-xor-복호화)
+- [알려진 일반 텍스트 XOR(플래그 접두사)](#알려진-일반-텍스트-xor플래그-접두사)
+  - [변형: 위치 인덱스를 사용한 XOR](#변형-위치-인덱스를-사용한-xor)
+- [혼합 모드(x86-64 / x86) 스테이저](#혼합-모드x86-64--x86-스테이저)
+- [LLVM(저수준 가상 머신) 난독화(제어 흐름 평면화)](#llvm저수준-가상-머신-난독화제어-흐름-평면화)
   - [Pattern](#pattern)
-  - [난독화 해제](#난독화 해제)
-- [S-Box / 키스트림 생성](#s-box--keystream-generation)
-  - [피셔-예이츠 셔플(Xorshift32)](#fisher-yates-shuffle-xorshift32)
-  - [Xorshift64* 키스트림](#xorshift64-keystream)
-  - [패턴 식별](#identifying-patterns)
-- [SECCOMP/BPF 필터 분석](#seccompbpf-filter-analytic)
-  - [BPF 분석](#bpf-analyse)
-- [예외 처리기 난독화](#Exception-handler-obfuscation)
+  - [De-obfuscation](#de-obfuscation)
+- [S-Box / 키스트림 생성](#s-box--키스트림-생성)
+  - [피셔-예이츠 셔플(Xorshift32)](#피셔-예이츠-셔플xorshift32)
+  - [Xorshift64* Keystream](#xorshift64-keystream)
+  - [Identifying Patterns](#identifying-patterns)
+- [SECCOMP/BPF 필터 분석](#seccompbpf-필터-분석)
+  - [BPF Analysis](#bpf-analysis)
+- [예외 처리기 난독화](#예외-처리기-난독화)
   - [RtlInstallFunctionTableCallback](#rtlinstallfunctiontablecallback)
-  - [VEH(벡터 예외 처리기)](#벡터 예외 처리기-veh)
-- [메모리 덤프 분석](#memory-dump-analytic)
-  - [바이너리 덤프 메모리 시](#when-binary-dumps-memory)
-  - [알려진 일반 텍스트 공격](#known-plaintext-attack)
-- [바이트별 균일 변환](#byte-wise-uniform-transforms)
-- [x86-64 문제](#x86-64-문제)
-  - [부호 확장](#sign-extension)
-  - [루프 경계 상태 업데이트](#loop-boundary-state-updates)
-- [사용자 정의 Mangle 함수 반전](#custom-mangle-function-reversing)
-- [위치 기반 변환 반전](#position-based-transformation-reversing)
-- [16진수로 인코딩된 문자열 비교](#hex-encoded-string-comparison)
-- [신호 기반 이진 탐색](#signal-based-binary-exploration)
-- [패칭을 통한 악성코드 차단 우회](#malware-anti-analytic-bypass-via-patching)
-- [다단계 쉘코드 로더](#multi-stage-shellcode-loaders)
-- [타이밍 사이드 채널 공격](#timing-side-channel-attack)
-- [디코이를 사용한 멀티 스레드 안티 디버그 + 신호 처리기 혼합 부울-산술(ApoorvCTF 2026)](#multi-thread-anti-debug-with-decoy--signal-handler-mixed-boolean-arithmetic-apoorvctf-2026)
-- [INT3 패치 + 코어 덤프 무차별 대입 Oracle(Pwn2Win 2016)](#int3-patch--coredump-brute-force-oracle-pwn2win-2016)
-- [신호 처리기 체인 + LD_PRELOAD Oracle(Nuit du Hack 2016)](#signal-handler-chain--ld_preload-oracle-nuit-du-hack-2016)
-- [printf 형식 문자열 VM Z3으로 디컴파일(SECCON 2017)](#printf-format-string-vm-decompilation-to-z3-seccon-2017)
+  - [VEH(벡터 예외 처리기)](#veh벡터-예외-처리기)
+- [메모리 덤프 분석](#메모리-덤프-분석)
+  - [바이너리가 메모리를 덤프할 때](#바이너리가-메모리를-덤프할-때)
+  - [알려진 일반 텍스트 공격](#알려진-일반-텍스트-공격)
+- [바이트별 균일 변환](#바이트별-균일-변환)
+- [x86-64 Gotchas](#x86-64-gotchas)
+  - [Sign Extension](#sign-extension)
+  - [루프 경계 상태 업데이트](#루프-경계-상태-업데이트)
+- [사용자 정의 Mangle 기능 반전](#사용자-정의-mangle-기능-반전)
+- [위치 기반 변환 반전](#위치-기반-변환-반전)
+- [16진수로 인코딩된 문자열 비교](#16진수로-인코딩된-문자열-비교)
+- [신호 기반 이진 탐색](#신호-기반-이진-탐색)
+- [패치를 통한 악성 코드 방지 분석 우회](#패치를-통한-악성-코드-방지-분석-우회)
+- [다단계 쉘코드 로더](#다단계-쉘코드-로더)
+- [타이밍 부채널 공격](#타이밍-부채널-공격)
+- [미끼 + 신호 처리기 혼합 부울 산술을 사용한 다중 스레드 안티 디버그(ApoorvCTF 2026)](#미끼--신호-처리기-혼합-부울-산술을-사용한-다중-스레드-안티-디버그apoorvctf-2026)
+- [INT3 패치 + 코어 덤프 무차별 대입 Oracle(Pwn2Win 2016)](#int3-패치--코어-덤프-무차별-대입-oraclepwn2win-2016)
+- [신호 처리기 체인 + LD_PRELOAD Oracle(Nuit du Hack 2016)](#신호-처리기-체인--ld_preload-oraclenuit-du-hack-2016)
+- [printf 형식 문자열 VM을 Z3으로 디컴파일(SECCON 2017)](#printf-형식-문자열-vm을-z3으로-디컴파일seccon-2017)
 
 ---
 
@@ -175,11 +175,18 @@ dc                   # Continue
 ```c
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include <stdarg.h>
 #include <sys/ptrace.h>
 
 long int ptrace(enum __ptrace_request req, ...) {
     long int (*orig)(enum __ptrace_request, pid_t, void*, void*);
     orig = dlsym(RTLD_NEXT, "ptrace");
+    va_list ap;
+    va_start(ap, req);
+    pid_t pid = va_arg(ap, pid_t);
+    void *addr = va_arg(ap, void *);
+    void *data = va_arg(ap, void *);
+    va_end(ap);
     // Log or modify behavior
     return orig(req, pid, addr, data);
 }
@@ -196,7 +203,7 @@ pwntools를 사용하여 직접 디버그 방지 호출을 패치합니다. 기�
 from pwn import *
 
 elf = ELF('./challenge', checksec=False)
-elf.asm(elf.symbols.ptrace, 'ret')   # Replace ptrace() with immediate return
+elf.asm(elf.symbols.ptrace, 'xor eax, eax; ret')  # Return success explicitly
 elf.save('patched')                   # Save patched binary
 ```
 
@@ -219,7 +226,7 @@ elf.asm(addr, 'mov eax, 1; ret')      # Return 1 (force success)
 
 ### Windows(디버그 이벤트)
 - `EXCEPTION_DEBUG_EVENT` → 메인 핸들러
-- 부모가 `PTRACE_POKETEXT`를 통해 자녀를 수정합니다.
+- 부모 디버거가 `WriteProcessMemory`/`SetThreadContext` 등 Windows 디버그 API로 자녀 상태를 수정합니다.
 - 매직 마커: `0x1337BABE`, `0xDEADC0DE`
 
 ### Analysis
@@ -379,14 +386,15 @@ def gen_sbox():
 ```python
 def gen_keystream():
     ks = []
-    state = SEED_64
+    mask = 0xffffffffffffffff
+    state = SEED_64 & mask
     mul = 0x2545f4914f6cdd1d
     for _ in range(256):
-        state ^= (state >> 12)
-        state ^= (state << 25)
-        state ^= (state >> 27)
-        state = (state * mul) & 0xffffffffffffffff
-        ks.append((state >> 56) & 0xff)
+        state = (state ^ (state >> 12)) & mask
+        state = (state ^ (state << 25)) & mask
+        state = (state ^ (state >> 27)) & mask
+        output = (state * mul) & mask
+        ks.append((output >> 56) & 0xff)
     return ks
 ```
 
@@ -427,10 +435,10 @@ if s.check() == sat:
 
 ## 예외 처리기 난독화
 
-### RtlInstallFunctionTable콜백
-- 동적 예외 처리기 등록
-- 핸들러는 새 핸들러를 설치하고 코드를 수정합니다.
-- 예외 처리기 중단과 함께 x64dbg 사용
+### RtlInstallFunctionTableCallback
+- 동적으로 생성된 코드 영역의 x64 unwind/function-table 메타데이터를 제공하는 콜백을 등록합니다.
+- 이것 자체가 예외 처리기를 등록하는 API는 아니지만, 난독화된 JIT·런타임 코드의 unwind 경계를 늦게 생성하는 데 쓰일 수 있습니다.
+- 콜백과 반환된 `RUNTIME_FUNCTION` 범위를 추적한 뒤 실제 SEH/VEH 제어 흐름과 구분합니다.
 
 ### VEH(벡터 예외 처리기)
 - `AddVectoredExceptionHandler` 핸들러 설치
@@ -455,7 +463,7 @@ encrypted = data[func_offset:func_offset+8]
 partial_key = bytes(a ^ b for a, b in zip(encrypted, prologue))
 ```
 
-**주요 통찰력:** 바이너리가 `/proc/self/mem` 또는 `/proc/self/maps`을 읽으면 자체 메모리를 덤프하는 것입니다. 아마도 암호화한 후에일 것입니다. 알려진 함수 프롤로그(`endbr64; push rbp; mov rbp, rsp`)를 알려진 일반 텍스트로 사용하여 암호화된 덤프에서 XOR 키를 복구하세요.
+**주요 통찰력:** `/proc/self/maps` 읽기는 매핑 탐색·안티분석·JIT·덤프 준비 등 여러 목적일 수 있고, 실제 바이트를 읽으려면 `/proc/self/mem`이나 다른 메모리 접근이 추가로 필요합니다. 덤프와 반복 XOR이 확인된 경우에만 대상 빌드에서 관찰한 프롤로그를 known plaintext로 사용하세요. `endbr64`와 frame-pointer 프롤로그는 CET·컴파일 옵션에 따라 없을 수 있습니다.
 
 ---
 
@@ -478,13 +486,13 @@ partial_key = bytes(a ^ b for a, b in zip(encrypted, prologue))
 
 ### Sign Extension
 ```python
-esi = 0xffffffc7  # NOT -57
+esi = 0xffffffc7  # 32-bit bit pattern; signed int32 is -57
 
 # For XOR: low byte only
 esi_xor = esi & 0xff  # 0xc7
 
 # For addition: full 32-bit with overflow
-r12 = (r13 + esi) & 0xffffffff
+r12 = (r13 + esi) & 0xffffffff  # a write to ESI zero-extends RSI on x86-64
 ```
 
 ### 루프 경계 상태 업데이트
@@ -567,9 +575,19 @@ echo "4d65746143..." | xxd -r -p
 
 ```c
 // LD_PRELOAD interposer to log sigaction calls
-int sigaction(int signum, const struct sigaction *act, ...) {
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <signal.h>
+#include <stdio.h>
+
+int sigaction(int signum, const struct sigaction *act,
+              struct sigaction *oldact) {
+    static int (*real_sigaction)(int, const struct sigaction *,
+                                 struct sigaction *);
+    if (!real_sigaction)
+        real_sigaction = dlsym(RTLD_NEXT, "sigaction");
     if (act && (act->sa_flags & SA_SIGINFO))
-        log("SET %d SA_SIGINFO=1\n", signum);
+        fprintf(stderr, "SET %d SA_SIGINFO=1\n", signum);
     return real_sigaction(signum, act, oldact);
 }
 ```
@@ -583,7 +601,7 @@ int sigaction(int signum, const struct sigaction *act, ...) {
 **패치할 일반적인 확인 사항:**
 | Check | Technique | Patch |
 |-------|-----------|-------|
-| `ptrace(PTRACE_TRACEME)` | Anti-debug | `cmp -1`을 `cmp 0`로 변경하세요. |
+| `ptrace(PTRACE_TRACEME)` | Anti-debug | 실제 반환값 검사와 실패 분기를 확인한 뒤 그 분기만 패치합니다. |
 | `sleep(150)` | Anti-sandbox timing | 수면 값을 1로 변경 |
 | `/proc/cpuinfo` "하이퍼바이저" | Anti-VM | `JNZ`에서 `JZ`로 뒤집기 |
 | "VMware"/"VirtualBox" 문자열| Anti-VM | `JNZ`에서 `JZ`로 뒤집기 |
@@ -597,10 +615,12 @@ int sigaction(int signum, const struct sigaction *act, ...) {
 2. 명령어 클릭 → `Ctrl+Shift+G` → opcode 수정
 3. `JNZ` (0x75) → `JZ` (0x74) 또는 그 반대의 경우
 4. 즉치값의 경우: 피연산자 바이트를 직접 변경합니다.
-5. 내보내기: `O` 누르기 → "원본 파일" 형식 선택
+5. `File → Export Program`에서 원본 형식을 선택해 새 파일로 내보냅니다.
 6. `chmod +x` 패치된 바이너리
 
 **서버측 유효성 검사 우회:**
+아래 작업은 소유하거나 명시적으로 허가받은 테스트 서버에서만 수행합니다.
+
 - 패치된 바이너리가 시스템 정보를 원격 서버로 보내는 경우 데이터도 패치합니다.
 - 데이터 수집 기능에서 문자열 주소 수정
 - 올바른 값을 직접 포함하도록 형식 문자열을 변경하세요.
@@ -632,7 +652,10 @@ flag = b''.join(v.to_bytes(4, 'little') for v in values)
 **패턴(시계 초과):** 검증 시간은 올바른 캐릭터에 따라 다릅니다(일치 시 더 긴 수면 시간).
 
 **Exploitation:**
+허가된 로컬 또는 CTF 서비스에서 요청 빈도 제한을 준수하며 측정하세요.
+
 ```python
+import string
 import time
 from pwn import *
 
@@ -737,10 +760,18 @@ Binary는 흐름 제어를 위해 Unix 신호를 사용합니다. `main()`는 SI
 
 ```c
 // LD_PRELOAD library:
+#define _GNU_SOURCE
+#include <dlfcn.h>
 #include <signal.h>
-sighandler_t signal(int sig, sighandler_t handler) {
+#include <unistd.h>
+
+typedef void (*handler_t)(int);
+handler_t signal(int sig, handler_t handler) {
+    static handler_t (*real_signal)(int, handler_t);
+    if (!real_signal)
+        real_signal = dlsym(RTLD_NEXT, "signal");
     write(2, "CORRECT\n", 8);  // signal() called = char was correct
-    return SIG_DFL;
+    return real_signal(sig, handler);
 }
 ```
 
@@ -748,7 +779,7 @@ sighandler_t signal(int sig, sighandler_t handler) {
 
 ---
 
-### printf 형식 문자열 VM을 Z3으로 디컴파일(SECCON 2017)
+## printf 형식 문자열 VM을 Z3으로 디컴파일(SECCON 2017)
 
 `%hhn` 형식 문자열을 통해 완전히 구현된 "가상 머신"입니다. 형식 문자열 `%hhn`은 인쇄된 문자 수(mod 256)를 가리키는 바이트에 씁니다. `%Nc%hhn` 명령어 시퀀스는 임의의 바이트-메모리 쓰기를 구현하여 효과적으로 바이트코드 VM을 생성합니다.
 

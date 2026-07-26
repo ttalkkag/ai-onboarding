@@ -66,8 +66,7 @@ Java.perform(function() {
     var Cipher = Java.use("javax.crypto.Cipher");
 
     Cipher.doFinal.overload('[B').implementation = function(input) {
-        var mode = this.getOpmode ? this.getOpmode() : "?";
-        console.log("[Cipher.doFinal] mode=" + mode);
+        console.log("[Cipher.doFinal] algorithm=" + this.getAlgorithm());
         console.log("  input: " + bytesToHex(input));
         var result = this.doFinal(input);
         console.log("  output: " + bytesToHex(result));
@@ -203,7 +202,7 @@ Java.perform(function() {
 
 ## 우회 클래스 Hook
 
-### 범용 SSL 고정 우회
+### SSL 검증 지점 예시(구현별 검증 필요)
 
 ```javascript
 Java.perform(function() {
@@ -224,45 +223,27 @@ Java.perform(function() {
         };
     } catch(e) {}
 
-    // X509TrustManager
-    try {
-        var X509TrustManager = Java.use("javax.net.ssl.X509TrustManager");
-        var TrustManager = Java.registerClass({
-            name: "com.bypass.TrustManager",
-            implements: [X509TrustManager],
-            methods: {
-                checkClientTrusted: function() {},
-                checkServerTrusted: function() {},
-                getAcceptedIssuers: function() { return []; }
-            }
-        });
-    } catch(e) {}
-
-    // Network Security Config (Android 7+)
-    try {
-        var NetworkSecurityConfig = Java.use("android.security.net.config.NetworkSecurityConfig");
-        NetworkSecurityConfig.isCleartextTrafficPermitted.implementation = function() { return true; };
-    } catch(e) {}
 });
 ```
 
-### 범용 루트 감지 우회
+`isCleartextTrafficPermitted()`는 HTTP 허용 여부이지 인증서 고정 검사가 아니므로 SSL 우회로 취급하지 않습니다. TrustManager를 새로 등록하기만 해서는 기존 연결에 적용되지 않으며, 실제 앱의 `SSLContext.init()` 또는 프레임워크별 검증 경로를 확인해야 합니다.
+
+### 루트 감지 지점 예시(대상별 검증 필요)
 
 ```javascript
 Java.perform(function() {
     // File.exists 우회
     var File = Java.use("java.io.File");
-    var rootPaths = ["su", "Superuser", "magisk", "busybox", "xposed",
-                     "/system/xbin/su", "/system/bin/su", "/sbin/su",
+    var rootNames = ["su", "superuser.apk", "magisk", "busybox", "xposed"];
+    var rootPaths = ["/system/xbin/su", "/system/bin/su", "/sbin/su",
                      "/data/local/xbin/su", "/data/local/bin/su"];
 
     File.exists.implementation = function() {
-        var path = this.getAbsolutePath();
-        for (var i = 0; i < rootPaths.length; i++) {
-            if (path.toLowerCase().indexOf(rootPaths[i].toLowerCase()) !== -1) {
-                console.log("[Root] Blocked: " + path);
-                return false;
-            }
+        var path = this.getAbsolutePath().toString().toLowerCase();
+        var name = this.getName().toString().toLowerCase();
+        if (rootNames.indexOf(name) !== -1 || rootPaths.indexOf(path) !== -1) {
+            console.log("[Root] Blocked: " + path);
+            return false;
         }
         return this.exists();
     };
@@ -270,7 +251,9 @@ Java.perform(function() {
     // Runtime.exec 우회
     var Runtime = Java.use("java.lang.Runtime");
     Runtime.exec.overload('java.lang.String').implementation = function(cmd) {
-        if (cmd.indexOf("su") !== -1 || cmd.indexOf("which") !== -1) {
+        var normalized = cmd.toString().trim().toLowerCase();
+        if (normalized === "su" || normalized.indexOf("su ") === 0 ||
+            /^which[ ]+su(?:[ ]|$)/.test(normalized)) {
             console.log("[Root] Blocked exec: " + cmd);
             throw Java.use("java.io.IOException").$new("Permission denied");
         }
@@ -295,7 +278,7 @@ Java.perform(function() {
     };
 
     // TracerPid 감지 우회(네이티브 레이어)
-    var fopen = Module.findExportByName("libc.so", "fopen");
+    var fopen = Process.getModuleByName("libc.so").findExportByName("fopen");
     Interceptor.attach(fopen, {
         onEnter: function(args) {
             this.path = args[0].readUtf8String();
@@ -377,7 +360,7 @@ Java.perform(function() {
 
 ## 언패킹 후크
 
-### 유니버셜 DEX 덤프
+### ClassLoader의 DEX 경로 열거(덤프 아님)
 
 ```javascript
 Java.perform(function() {
@@ -467,6 +450,6 @@ function findInstances(className) {
 | Frida 공식 문서| API 참고| https://frida.re/docs/ |
 | Frida CodeShare | 커뮤니티 스크립트 공유| https://codeshare.frida.re/ |
 | awesome-frida | 자원백과사전| https://github.com/dweinstein/awesome-frida |
-| frida-codeshare-scripts | 인터넷에서 가장 완벽한 스크립트 모음| https://github.com/zengfr/frida-codeshare-scripts |
+| frida-codeshare-scripts | 커뮤니티 스크립트 모음| https://github.com/zengfr/frida-codeshare-scripts |
 | Objection | Frida 포장 도구| https://github.com/sensepost/objection |
 | r2frida | radare2 + Frida 통합| https://github.com/nowsecure/r2frida |

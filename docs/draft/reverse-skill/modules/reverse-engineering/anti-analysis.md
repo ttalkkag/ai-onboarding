@@ -3,46 +3,46 @@
 실용적인 우회 방법을 통해 CTF 문제에서 발생하는 디버깅 방지, VM 방지, DBI 방지 및 무결성 검사 기술에 대한 포괄적인 참조 자료입니다.
 
 ## 목차
-- [Linux 안티디버그(고급)](#linux-anti-debug-advanced)
-  - [ptrace 기반](#ptrace 기반)
-  - [/proc 파일 시스템 검사](#proc-filesystem-checks)
-  - [타이밍 기반 감지](#timing 기반 감지)
-  - [신호 기반 안티 디버그](#signal-based-anti-debug)
-  - [Syscall-레벨 회피](#syscall-level-evasion)
-- [Windows 안티 디버그(고급)](#windows-anti-debug-advanced)
-  - [PEB(프로세스 환경 차단) 검사](#peb-process-environment-block-checks)
-  - [NtQuery정보프로세스](#ntqueryinformationprocess)
-  - [힙 플래그](#heap-flags)
-  - [TLS 콜백](#tls-콜백)
-  - [하드웨어 중단점 감지](#hardware-breakpoint-Detection)
-  - [소프트웨어 중단점 감지(INT3 검색)](#software-breakpoint-Detection-int3-scanning)
-  - [예외 기반 안티 디버그](#Exception-based-anti-debug)
-  - [NtSetInformationThread(스레드 숨기기)](#ntsetinformationthread-thread-hiding)
-- [안티 VM / 안티 샌드박스](#anti-vm--anti-sandbox)
-  - [CPUID 하이퍼바이저 비트](#cpuid-hypervisor-bit)
-  - [MAC 주소 / 하드웨어 지문](#mac-address--hardware-fingerprinting)
-  - [타이밍 기반 VM 감지](#timing-based-vm-Detection)
-  - [파일/레지스트리 아티팩트](#file--registry-artifacts)
-  - [리소스 확인(CPU 수, RAM, 디스크)](#resource-checks-cpu-count-ram-disk)
-- [Anti-DBI(동적 바이너리 계측)](#anti-dbi-dynamic-binary-instrumentation)
-  - [Frida 감지](#frida-Detection)
-  - [Pin/DynamoRIO 탐지](#pindynamorio-탐지)
-- [코드 무결성 / 자체 해싱](#code-integrity--self-hashing)
-- [분해 방지 기술](#anti-disassemble-techniques)
-  - [불투명 술어](#opaque-predicates)
-  - [정크 바이트 / 중복 지침](#junk-bytes--overlapping-instructions)
-  - [중간 점프](#중간 점프)
-  - [함수 청킹 / 분산 코드](#function-chunking--scattered-code)
-  - [제어 흐름 평탄화(고급)](#control-flow-Flattening-advanced)
-  - [혼합 부울-산술(MBA) 식별 및 단순화](#mixed-boolean-arithmetic-mba-identification--simplification)
-- [실행 모드 전환을 위한 SIGILL 핸들러(Hack.lu 2015)](#sigill-handler-for-execution-mode-switching-hacklu-2015)
-- [strace 계산을 통한 SIGFPE 신호 처리기 측 채널(PlaidCTF 2017)](#sigfpe-signal-handler-side-channel-via-strace-counting-plaidctf-2017)
-- [Keystone 및 Unicorn을 사용한 명령 추적 반전(MeePwn CTF 2017)](#instruction-trace-inversion-with-keystone-and-unicorn-meepwn-ctf-2017)
-- [스택 프레임 조작을 통한 무콜 함수 체이닝(THC CTF 2018)](#call-less-function-chaining-via-stack-frame-manipulation-thc-ctf-2018)
-- [종합적인 우회 전략](#comprehensive-bypass-strategies)
-  - [유니버설 바이패스 체크리스트](#universal-bypass-checklist)
-  - [계층형 안티디버그(실제 패턴)](#layered-anti-debug-real-world-pattern)
-  - [빠른 참조: 우회 확인](#quick-reference-check-to-bypass)
+- [Linux 안티 디버그(고급)](#linux-안티-디버그고급)
+  - [ptrace-Based](#ptrace-based)
+  - [/proc 파일 시스템 검사](#proc-파일-시스템-검사)
+  - [Timing-Based Detection](#timing-based-detection)
+  - [Signal-Based Anti-Debug](#signal-based-anti-debug)
+  - [Syscall-Level Evasion](#syscall-level-evasion)
+- [Windows 디버그 방지(고급)](#windows-디버그-방지고급)
+  - [PEB(프로세스 환경 블록) 검사](#peb프로세스-환경-블록-검사)
+  - [NtQueryInformationProcess](#ntqueryinformationprocess)
+  - [Heap Flags](#heap-flags)
+  - [TLS Callbacks](#tls-callbacks)
+  - [하드웨어 중단점 감지](#하드웨어-중단점-감지)
+  - [소프트웨어 중단점 감지(INT3 검색)](#소프트웨어-중단점-감지int3-검색)
+  - [Exception-Based Anti-Debug](#exception-based-anti-debug)
+  - [NtSetInformationThread(스레드 숨기기)](#ntsetinformationthread스레드-숨기기)
+- [Anti-VM / Anti-Sandbox](#anti-vm--anti-sandbox)
+  - [CPUID 하이퍼바이저 비트](#cpuid-하이퍼바이저-비트)
+  - [MAC 주소/하드웨어 핑거프린팅](#mac-주소하드웨어-핑거프린팅)
+  - [타이밍 기반 VM 감지](#타이밍-기반-vm-감지)
+  - [파일/레지스트리 아티팩트](#파일레지스트리-아티팩트)
+  - [리소스 확인(CPU 수, RAM, 디스크)](#리소스-확인cpu-수-ram-디스크)
+- [안티-DBI(동적 바이너리 계측)](#안티-dbi동적-바이너리-계측)
+  - [Frida Detection](#frida-detection)
+  - [Pin/DynamoRIO 감지](#pindynamorio-감지)
+- [코드 무결성/셀프 해싱](#코드-무결성셀프-해싱)
+- [Anti-Disassembly Techniques](#anti-disassembly-techniques)
+  - [Opaque Predicates](#opaque-predicates)
+  - [정크 바이트/중복 지침](#정크-바이트중복-지침)
+  - [Jump-in-the-Middle](#jump-in-the-middle)
+  - [함수 청킹/분산 코드](#함수-청킹분산-코드)
+  - [제어 흐름 평탄화(고급)](#제어-흐름-평탄화고급)
+  - [혼합 부울 산술(MBA) 식별 및 단순화](#혼합-부울-산술mba-식별-및-단순화)
+- [실행 모드 전환을 위한 SIGILL 핸들러(Hack.lu 2015)](#실행-모드-전환을-위한-sigill-핸들러hacklu-2015)
+- [strace 계산을 통한 SIGFPE 신호 처리기 측면 채널(PlaidCTF 2017)](#strace-계산을-통한-sigfpe-신호-처리기-측면-채널plaidctf-2017)
+- [Keystone 및 Unicorn을 사용한 명령 추적 반전(MeePwn CTF 2017)](#keystone-및-unicorn을-사용한-명령-추적-반전meepwn-ctf-2017)
+  - [스택 프레임 조작을 통한 무호출 함수 체이닝(THC CTF 2018)](#스택-프레임-조작을-통한-무호출-함수-체이닝thc-ctf-2018)
+- [포괄적인 우회 전략](#포괄적인-우회-전략)
+  - [유니버설 바이패스 체크리스트](#유니버설-바이패스-체크리스트)
+  - [계층화된 안티디버그(실제 패턴)](#계층화된-안티디버그실제-패턴)
+  - [빠른 참조: 우회 확인](#빠른-참조-우회-확인)
 
 ---
 
@@ -56,7 +56,7 @@ if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1) exit(1); // Already traced = debugger
 ```
 
 **Bypasses:**
-```bash
+```text
 # 1. LD_PRELOAD (see patterns.md for full hook)
 LD_PRELOAD=./hook.so ./binary
 
@@ -72,13 +72,14 @@ elf.save('patched')
 gdb ./binary
 (gdb) catch syscall ptrace
 (gdb) run
-# When it stops at ptrace:
+# catch syscall stops on both entry and return. Continue past the entry stop,
+# then replace the return value at the second stop:
+(gdb) continue
 (gdb) set $rax = 0
 (gdb) continue
-
-# 4. Kernel config (requires root)
-echo 0 > /proc/sys/kernel/yama/ptrace_scope
 ```
+
+`kernel.yama.ptrace_scope`는 프로세스 간 attach 정책을 제한하는 설정이며, 대상 프로세스의 `PTRACE_TRACEME` 호출을 성공으로 바꾸는 우회가 아닙니다.
 
 **Double-ptrace pattern:**
 ```c
@@ -108,7 +109,7 @@ grep("frida", "/proc/self/maps");
 ```
 
 **Bypasses:**
-```bash
+```text
 # 1. LD_PRELOAD fopen/fread to fake /proc contents
 # 2. Mount namespace isolation
 unshare -m bash -c 'mount --bind /dev/null /proc/self/status && ./binary'
@@ -141,7 +142,7 @@ gettimeofday(&tv1, NULL);
 ```
 
 **Bypasses:**
-```bash
+```text
 # 1. Frida hook (see tools-dynamic.md for clock_gettime hook)
 
 # 2. GDB: skip rdtsc by patching with constant
@@ -170,7 +171,7 @@ signal(SIGSEGV, real_logic_handler);
 ```
 
 **Bypasses:**
-```bash
+```text
 # GDB: pass signals to program instead of handling them
 (gdb) handle SIGTRAP nostop pass
 (gdb) handle SIGALRM ignore
@@ -184,18 +185,23 @@ signal(SIGSEGV, real_logic_handler);
 ```c
 // Direct syscall instead of libc — bypasses LD_PRELOAD hooks
 long ret;
-asm volatile("syscall" : "=a"(ret) : "a"(101), "D"(0), "S"(0), "d"(0), "r"(0));
+register long r10 __asm__("r10") = 0;
+asm volatile("syscall"
+             : "=a"(ret)
+             : "a"(101L), "D"(0L), "S"(0L), "d"(0L), "r"(r10)
+             : "rcx", "r11", "memory");
 // Syscall 101 = ptrace on x86_64
 ```
 
 **우회:** 바이너리 자체를 패치하거나 ptrace를 사용하여 syscall 수준에서 가로채야 합니다.
-```bash
+```text
 # GDB: catch syscall
 (gdb) catch syscall 101
-(gdb) commands
-> set $rax = 0
-> continue
-> end
+(gdb) run
+# First stop is syscall entry; second is syscall return.
+(gdb) continue
+(gdb) set $rax = 0
+(gdb) continue
 ```
 
 ---
@@ -277,13 +283,12 @@ PIMAGE_TLS_CALLBACK callbacks[] = { TlsCallback, NULL };
 ### 하드웨어 중단점 감지
 
 ```c
-// Read debug registers via GetThreadContext
-CONTEXT ctx;
-ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-GetThreadContext(GetCurrentThread(), &ctx);
-if (ctx.Dr0 || ctx.Dr1 || ctx.Dr2 || ctx.Dr3) exit(1);
-
-// Also via exception handler: deliberate exception, check DR regs in handler
+// GetThreadContext(GetCurrentThread(), ...) may report success but returns
+// an invalid context. Inspect a suspended *different* thread, or inspect the
+// CONTEXT supplied to an exception handler.
+BOOL debug_registers_set(const CONTEXT *ctx) {
+    return ctx->Dr0 || ctx->Dr1 || ctx->Dr2 || ctx->Dr3;
+}
 ```
 
 **Bypass:**
@@ -310,15 +315,13 @@ if (checksum != EXPECTED_CHECKSUM) exit(1);
 ### Exception-Based Anti-Debug
 
 ```c
-// UnhandledExceptionFilter — under debugger, filter is NOT called
+// A debugger receives the exception first. Whether the process filter later
+// runs depends on the debugger's first-/second-chance handling configuration.
 SetUnhandledExceptionFilter(handler);
 RaiseException(EXCEPTION_ACCESS_VIOLATION, 0, 0, NULL);
-// If handler runs: no debugger
-// If debugger catches: debugger present
 
-// INT 2D — debugger single-step anomaly
-__asm { int 2dh }  // Debugger silently consumes the exception
-// If execution continues: debugger present
+// INT 2D behavior also varies by Windows version, debugger, and debugger state.
+__asm { int 2dh }
 ```
 
 ### NtSetInformationThread(스레드 숨기기)
@@ -442,13 +445,13 @@ while ((entry = readdir(dir))) {
 // Frida creates \\.\pipe\frida-* named pipes
 ```
 
-**Frida Frida 탐지 우회:**
+**Frida 탐지 우회:**
 ```javascript
 // Hook the detection functions themselves
-Interceptor.attach(Module.findExportByName(null, "strstr"), {
+Interceptor.attach(Module.getGlobalExportByName("strstr"), {
     onEnter(args) {
-        this.haystack = Memory.readUtf8String(args[0]);
-        this.needle = Memory.readUtf8String(args[1]);
+        this.haystack = args[0].readUtf8String();
+        this.needle = args[1].readUtf8String();
     },
     onLeave(retval) {
         if (this.needle && (this.needle.includes("frida") || this.needle.includes("gadget"))) {
@@ -518,8 +521,9 @@ void *watchdog(void *arg) {
 ```asm
 ; Condition that always evaluates the same way but looks data-dependent
 mov eax, [some_memory]
-imul eax, eax          ; x^2
-and eax, 1             ; x^2 mod 2 is always 0 for any x
+lea ecx, [eax + 1]
+imul eax, ecx          ; x * (x + 1)
+and eax, 1             ; consecutive integers' product is always even
 jnz fake_branch        ; Never taken, but disassembler doesn't know
 ; real code here
 ```
@@ -584,8 +588,8 @@ e8             ; fake CALL opcode — disassembler tries to decode as call
 # SiMBA tool for automated simplification:
 # pip install simba-simplifier
 from simba import simplify_mba
-expr = "(a | b) + (a & b) - (~a & b)"
-print(simplify_mba(expr))  # → a
+expr = "(a ^ b) + 2*(a & b)"
+print(simplify_mba(expr))  # → a + b
 ```
 
 ---
@@ -732,8 +736,8 @@ def reverse_processing(byte):
 2. **정적 패치** — NOP/patch 실행 전 pwntools 또는 Ghidra로 확인합니다.
 3. **LD_PRELOAD** (Linux) — 가짜 값을 반환하는 후크 libc 함수
 4. **ScyllaHide** (Windows x64dbg) — PEB 패치, NT 기능 자동 후크
-5. **에뮬레이션**(Unicorn/Qiling) — 감지할 디버거 아티팩트가 없습니다.
-6. **커널 수준 우회** — `/proc/sys/kernel/yama/ptrace_scope` 수정, `prctl` 사용
+5. **에뮬레이션**(Unicorn/Qiling) — 일반 디버거와 다른 환경이지만 에뮬레이터 지문과 미구현 API는 대상별 처리 필요
+6. **커널 수준 관찰** — 격리된 분석 VM에서만 커널 디버거/추적 도구를 사용
 
 ### 계층화된 안티디버그(실제 패턴)
 

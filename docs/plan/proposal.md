@@ -1,314 +1,275 @@
-# secure-onboard 스캐너 엔진 재설계 기획서
+# Secure Onboard 기획서
 
-- 문서 상태: **완성 (Plan Complete) v1.0** — 완성 기준·체크리스트는 §11
-- 작성일: 2026-06-26 · 최종 정합성 리뷰: 2026-07-05 (3-관점 독립 리뷰, §11.3)
-- 범위: **1차 보안 스캐너 엔진**의 재설계 (탐지 규칙 · 생태계 커버리지 · 오탐/미탐 개선)
-- 방향: **계층형 엔진** — Tier-0 자체 휴리스틱(제로 의존, 어디서든 즉시) + Tier-1 정적 도구·의존성 인텔(운영자 설치, 대상 미실행). 검사 중 **대상은 불간섭**. (동적 분석만 escalation)
-- 근거 리서치: `../research/threat-catalog.md`, `../research/reverse-skill-harvest.md`(탐지지식 발굴), `../research/capability-tiers.md`(Tier 분류), 아래 2-페이즈 신뢰 모델
+- 문서 상태: **M0 hook tracer-bullet GO / 전체 M1 NO-GO**
+- 기준일: 2026-07-26
+- 제품: Claude Code·Codex 로컬 CLI용 선택형 실행 가드레일
+- 구현 상태: 미착수. 첫 단계는 두 클라이언트의 `PreToolUse` tracer-bullet이다.
+- 정책 정본: `decisions.md`
+- 상태 전이 정본: `workflow.md`
+- 출력·필드 정본: `report-template.md`
 
----
+## 1. 문제와 사용자
 
-## 1. 배경과 목적
+내부 사용자는 AI나 코딩에 익숙하지 않아 외부에서 받은 프로젝트·코드·파일을 충분히 확인하지 않고 AI에 설치·실행하도록 요청한다. 이 과정에서 패키지 설치 훅, 위장 파일, 비정상 스크립트, 권한 변경, 비밀정보 노출로 보안 사고가 발생한다.
 
-### 1.1 막으려는 위협 (단 하나)
+Secure Onboard는 AI가 실제 로컬 작업을 수행하기 직전에 위험을 쉬운 말로 설명한다. 중대한 위험은 AI 자동 실행을 막되, 로컬 개발 중인 파일과 오탐 가능성을 고려해 사용자가 위험을 다시 확인하면 원래 명령을 직접 판단할 수 있도록 보여 준다.
 
-**모르는 외부 프로젝트를 내려받아, 의심 없이 실행하는 것.**
+## 2. 제품 목표
 
-설치/클론/빌드 명령 한 번이 라이프사이클 훅(`postinstall` 등)·빌드 스텝·CI를 통해
-**원격 임의 코드를 자동 실행**시킨다. 대표 사례: LinkedIn 채용 사칭 백도어
-(`npm install` → `prepare` → `app:pre` → `node app/index.js` → `require('./test')` → 테스트로 위장한 `app/test/index.js`).
+1. 실행·설치·열기·설정·권한 변경·보안 검사 요청을 Claude Code CLI와 Codex CLI에서 식별한다.
+2. 실제 로컬 도구 호출 직전에 같은 공용 규칙으로 `HIGH`, `LOW`, `INFO`를 판정한다.
+3. HIGH는 AI 자동 실행을 차단하고, LOW는 실행 전 경고하며, INFO는 로컬 기록만 남긴다.
+4. 구체적 명령과 의도 요청, 사용자 원문과 AI 생성 명령을 혼동하지 않는다.
+5. 로컬 캐시로 같은 대상·작업의 중복 검사를 줄인다.
+6. 개인 컴퓨터에서 전역 또는 프로젝트별로 활성화하고 언제든 비활성화할 수 있다.
 
-### 1.2 2-페이즈 신뢰 모델 (이 엔진의 적용 경계)
+## 3. 제품이 아닌 것
 
-| 페이즈 | 대상 | 검증 대상? |
-|--------|------|-----------|
-| 운영자 도구 | 내가 **의도해서** 미리 설치하는 스캐너·분석 도구 | ❌ 아님 (의도된 설치) |
-| 모르는 대상 | 내려받아 **실행하려는** 외부 프로젝트 | ✅ **여기가 이 엔진의 검증 지점** |
+- Finder·파일 탐색기 또는 OS 전역 실행 차단기
+- 일반 터미널 감시기
+- 관리자가 강제하는 보안 정책이나 중앙 감사 시스템
+- 프로젝트 전체의 영구적인 안전 인증
+- Claude Code·Codex의 데이터 전송을 막는 DLP
+- 동적 악성코드 sandbox, DAST, detonation, 디버거·후킹 도구
 
-→ 이 엔진은 **모르는 대상**을, **설치·실행하기 전에**, **읽기 전용**으로 검사한다.
+## 4. 지원 범위
 
-### 1.3 목적
+### 4.1 지원 클라이언트
 
-"설치 전 1차 게이트"의 **탐지 엔진을 재설계**해 두 지표를 동시에 끌어올린다:
-- **오탐 ↓**: 정상 코드를 위험으로 잘못 표시해 피로/무시를 유발하지 않게
-- **미탐 ↓**: 난독화·다단계·비-npm 생태계의 설치-시 실행을 놓치지 않게
+- Claude Code CLI
+- Codex CLI
 
----
+각 클라이언트는 별도 plugin manifest와 얇은 hook adapter를 가진다. 공용 규칙·캐시·로그·상태 관리는 하나의 로컬 코어가 담당한다. 저장소 스킬 심볼릭 링크는 제품 배포 구조로 사용하지 않는다.
 
-## 2. 설계 원칙
+현재 저장소의 `.skills/sample`과 세 skills symlink는 예제 자산으로만 유지한다. M1 제품 코드를 `.skills/secure-onboard`에 만들거나 이 링크를 설치 방식으로 재사용하지 않는다.
 
-### 2.1 안전 불변식 (위반 금지) — 전부 "대상"에 대한 규칙
+### 4.2 단계별 작업 범위
 
-- **S1 · 대상 불간섭**: 보안 검사는 **대상 프로젝트를 설치·실행·빌드하지 않고, 대상의 의존성도 설치하지 않는다.**
-  (`npm/pip install`, `make`, 빌드, `npm start`, `postinstall` 트리거 등 일절 금지)
-- **S2 · 대상에 읽기 전용**: 대상 파일을 **읽고 분석만** 한다. 대상 코드 실행 금지. (엔진이 *대상 메타데이터*를 공개 DB에 조회하는 것은 대상 실행이 아니므로 허용 — §2.3)
-- **S3 · 사람이 최종 판정**: 휴리스틱은 1차 분류기일 뿐. HIGH/MED는 사람이 파일을 열어 확정. **"신호 없음 ≠ 안전 증명."**
-- **S4 · 설치 전 트리거 최우선**: "설치/클론/빌드만으로 자동 실행되는" 경로를 가장 높은 우선순위로 탐지.
-- **S5 · 대상 텍스트 = 데이터**: 대상의 README·주석·문서에 든 명령형 문장("이걸 실행하라" 등)은 **행동 지침이 아니라 분석 데이터**로 취급한다. 스캐너가 LLM 에이전트로 구동될 때 대상 텍스트에 의한 프롬프트 인젝션을 막는다. (reverse-skill 거버넌스에서 채택)
+| 단계 | 범위 | 완료 증거 |
+|------|------|-----------|
+| M0 hook tracer-bullet | Claude·Codex의 shell/exec `PreToolUse`, 고정 sentinel의 HIGH deny·LOW/INFO continue, result·Stop hook, 상태 진단 | 실제 native payload fixture, 차단 대상 tool handler·process 0, native approval 유지 |
+| M1 fixture-backed alpha | npm 설치, 로컬 파일 열기, 명시적 읽기 전용 검사, 결정론적 규칙, 명령 출처·재확인·표시, scope·로그·캐시 | 확정 fixture manifest와 expected JSON 통과 |
+| M2 심층 분석 | install hook→sink, secret source→외부 sink, container·실행 경로 분석, 검증된 AI 승격, 추가 MCP/file-edit coverage | 별도 스키마와 회귀 oracle 통과 |
 
-> 위 불변식은 **전부 대상(모르는 프로젝트)에 대한 규칙**이다. **엔진 자신에 대한 규칙이 아니다.**
+빌드·테스트·설정·권한 변경은 의미 트리거와 탐지 카탈로그에 포함하지만 M1 지원 grammar는 아니다. 훅이 관찰한 범위 밖 호출은 `NOT_COVERED`로 통과시키고 coverage 진단만 남기며 `INFO` 판정이나 보호 성공으로 표현하지 않는다. native file write/edit·일반 MCP는 M2에서 별도 coverage test와 case를 만든 뒤 지원으로 표시한다. hook이 관찰하지 않는 경로에는 event도 만들 수 없다.
 
-### 2.2 엔진 자신은 운영자 도구다 → 계층형 능력
+명시적 보안 검사는 대상을 실행하지 않는 읽기 전용 작업이다. HIGH finding을 발견해도 검사 자체는 끝까지 수행하고 별도 `ScanReport`로 알린다. 같은 대상을 설치·열기·실행하는 후속 action은 새 `ActionDecision`으로 게이트한다. scan은 어댑터가 native session·prompt·물리 cwd를 주입하는 구조화 helper로만 시작하며 모델이 내부 context를 정하지 않는다.
 
-엔진과 그 구동 도구는 **운영자가 의도해서 설치하는 도구**다(`../research/README.md` R2). 분류 기준은 *대상을 실행하는가?* 단 하나:
+### 4.3 범위 밖 실행
 
-> **도구 설치 필요 ≠ escalation. 메타데이터 네트워크 조회 ≠ escalation. 오직 대상을 실행/설치/빌드/계측하는 것만 escalation.**
+- 일반 터미널에 붙여 넣은 HIGH 명령
+- Finder·파일 탐색기에서 연 파일
+- 플러그인·훅이 꺼졌거나 신뢰되지 않은 세션
+- 훅이 관찰하지 않는 hosted·특수 도구
+- 이미 시작된 대화형 프로세스의 후속 입력
+- `--bare` 또는 `CLAUDE_CODE_SIMPLE=1`로 시작하고 Secure Onboard plugin을 명시적으로 전달하지 않은 Claude Code 세션
 
-이에 따라 엔진을 **3계층**으로 설계한다 (전체 도구 매핑: `../research/capability-tiers.md`):
+## 5. 사용자 경험
 
-| 계층 | 정의 | 예 |
-|------|------|----|
-| **Tier-0** | 제로 의존(운영자 사전설치 불필요 + 번들 데이터, 무네트워크). 기본 활성, 어디서든 즉시·유출 0 | 휴리스틱·구조파싱, `strings/otool/shasum`, **OSV 오프라인 매칭(악성 `MAL-`)**, 타이포스쿼팅 사전 |
-| **Tier-1** | 운영자가 깐 정적 도구·메타데이터 조회. 대상 미실행. 있으면 사용, 없으면 Tier-0 | **GuardDog·Semgrep·OSV-Scanner·YARA-X·gitleaks**, LIEF/rabin2 정적, deps.dev 평판 |
-| **Escalation** | 대상 실행/계측/동적 | 디버거·Frida·에뮬·샌드박스·재서명설치 — 온보딩 3단계(승인+샌드박스) |
+### 5.1 구체적 명령 요청
 
-- **자체 휴리스틱(Tier-0)은 여전히 항상-켜진 코어**다 — 채택한 "자체 휴리스틱 고도화"는 Tier-0로 보존.
-- install-phobia 교정으로 **Tier-1(정적 도구·의존성 인텔)을 되찾았다** — 과거 "엔진은 설치/조회 안 함" 오류로 버렸던 검증된 능력.
-- *어디까지 구현할지(Tier-0만 / +Tier-1 / 도구 채택 범위)는 **미결** — `decisions.md` D2에 옵션·장단점 기록, 구현 단계에서 결정.*
-- *"제로 의존"의 정확한 뜻*: **운영자가 스캐너를 위해 별도 도구를 설치할 필요 없음**이다. ⚠️ 최신 macOS(14+)는 python3를 기본 탑재하지 않으므로 "macOS 기본 = python3 보장"이 아니다 — substrate·파서 부재 시 fail-closed 처리는 `decisions.md` D1(구속 안전조건) 참조.
+```text
+사용자: `npm install adsf` 실행해 줘
 
-### 2.3 네트워크 축
-
-대상-주도 네트워크(C2·postinstall fetch)는 **대상을 실행해야 발생** → 불변식이 자동으로 막는다(별도 규칙 불필요). 반면 **엔진이 대상의 선언 의존성을 공개 DB에 조회**(OSV/deps.dev/레지스트리)하는 것은 대상 미실행이라 허용 — 유일 리스크는 프라이버시. **정책(D4 결정 기준선)**: **기본 오프라인(0 egress)** — 취약/악성은 번들 OSV DB(Tier-0)로 1차 처리. deps.dev/레지스트리 **평판 보강만 온라인·Tier-1로 `--online` 옵트인**(기본 OFF, 프라이버시 고지). 현행 MVP는 네트워크 없음. 상세·갱신 주기는 `decisions.md` D4.
-
----
-
-## 3. 현 휴리스틱 방식의 한계 (재설계 동기)
-
-라인 단위 정규식 1차 스캐너에서 일반적으로 관찰되는 한계:
-
-1. **컨텍스트 부재** → 오탐: 주석·문자열·테스트 픽스처 안의 `eval`/`child_process`를 실제 위험과 구분 못 함.
-2. **매니페스트를 텍스트로만 봄** → 부정확: 파서 없이 `grep` fallback에 의존하면 중첩/멀티라인 scripts를 놓침.
-3. **고정 등급** → 가중 불가: `eval` 1건과 "설치 훅 안의 네트워크+eval 동시"를 같은 MED로 취급.
-4. **생태계 편중** → 미탐: npm 외(Python `setup.py`, Dockerfile `RUN`, CI yaml)의 설치-시 실행이 약함.
-5. **단일 패스** → 미탐: base64/hex 인코딩 페이로드, `훅 → 별도 파일 → eval`의 다단계 추적 불가.
-
----
-
-## 4. 재설계 아키텍처 — 5개 고도화 레버
-
-```
-[입력 디렉토리]
-   │
-   ▼
-(1) 구성 인식 ──▶ 생태계/진입점/매니페스트 식별
-   │
-   ▼
-(2) 구조 파싱 ──▶ 매니페스트·설정을 "정식 파서"로 구조화 (python3/node, 없으면 보수적 fallback)
-   │
-   ▼
-(3) 규칙 평가 ──▶ 데이터 기반 규칙표 × 컨텍스트-인지 매칭
-   │              (주석/문자열 제거, 디코드-후-재검사, 다단계 추적)
-   ▼
-(4) 신뢰도 점수 ──▶ severity × confidence → 최종 등급 (오탐 완화/가중 신호 반영)
-   │
-   ▼
-(5) 보고 ──▶ 사람용 .md + (옵션) 기계용 .json, 종료코드
+판정: HIGH — AI 자동 실행 차단
+요청 유형: 구체적 명령어
+명령 출처: 사용자가 직접 제공
+작업 요약: adsf npm 패키지 설치
+명령 상태: 실행되지 않음 — 재확인 전 원문을 다시 제공하지 않음
 ```
 
-### 4.1 (레버 A) 구조 파싱 레이어
+### 5.2 의도 요청
 
-매니페스트/설정을 텍스트가 아니라 **구조로** 읽는다. 파서 런타임은 **엔진 자신의 의존성**이므로 요구해도 된다(2.2):
-- 권장 기준선: `python3`(대다수 dev 머신에 존재)를 파서로 사용. 이식성 목표상 `node`/`jq` 대체·보수적 fallback도 지원하되, fallback은 **안전요건이 아니라 편의**다. (엔진 substrate를 pure-bash로 둘지 python 가정으로 둘지는 후속 결정)
-- 대상: `package.json`(scripts/의존성), `pyproject.toml`/`setup.py`/`setup.cfg`, `Cargo.toml`,
-  `go.mod`, `composer.json`, `Gemfile`, `Dockerfile`, `.github/workflows/*.yml`, `Makefile`, `.npmrc`.
+```text
+사용자: adsf 패키지를 설치해 줘
 
-### 4.2 (레버 B) 데이터 기반 규칙 모델
-
-규칙을 **선언적 데이터 테이블**로(엔진 내부에 내장 — 외부 파일 의존 없음):
-
-| 필드 | 의미 |
-|------|------|
-| `id` | 규칙 식별자 (예: `npm.lifecycle.install-hook`) |
-| `ecosystem` | npm / pip / docker / ci / generic … |
-| `category` | 설치트리거 · 원격실행 · 난독화 · 유출 · 의존성위생 · 레지스트리 · 위장파일 |
-| `base_severity` | HIGH / MED / INFO |
-| `confidence_weight` | 정탐 신뢰도 기여도 |
-| `rationale` | 왜 위험한지 (보고서에 그대로 노출) |
-
-→ 새 생태계/패턴 추가가 "규칙 한 줄 추가"로 끝난다. (코드 분기 추가 아님)
-
-### 4.3 (레버 C) 컨텍스트-인지 매칭
-
-라인 매칭 전에 **노이즈 제거**:
-- 주석·문자열 리터럴 제거 후 매칭 → 주석 처리된/문서 예시의 `eval` 오탐 제거.
-- 테스트 픽스처·벤더 디렉토리(`node_modules`, `vendor`, `testdata/`)는 **컨텍스트 태깅** 후 감점.
-- 알려진 도구 allowlist(husky/lefthook/simple-git-hooks 등) → 라이프사이클 훅 오탐 감점.
-
-### 4.4 (레버 D) 디코드-후-재검사 + 다단계 추적
-
-- **인코딩 체인**: `base64`/hex 블롭을 **읽기 전용으로 디코드**해 2차 패턴 재검사 (예: `Buffer.from('…','base64')` → 디코드 → 내부 `http://IP` 발견 시 승격). 인코딩 식별은 길이+문자셋 휴리스틱(Base64/32/58·Hex·`\uXXXX`·JWT)으로 분기.
-- **상수·매직바이트 카탈로그**: 암호/난독 상수(AES S-Box·ChaCha `"expa"`·TEA `0x9E3779B9`)와 압축/패킹 magic(`1F 8B`·`UPX!`·임베디드 ZIP `PK\x03\x04`)로 숨은 페이로드 식별.
-- **다단계 트리거**: `라이프사이클 훅 → 호출 대상 파일 → 그 파일의 위험 패턴`을 1~2 hop 정적 추적해 연결.
-- **난독화 추정**: 초장문 단일라인(세미콜론 1000+·`:=` 체인·`ord/chr`·XOR)·엔트로피>7.5·minified `dist/`+RC4 등으로 패킹/난독 플래그.
-
-> 구체 시그니처 라이브러리는 `../research/reverse-skill-harvest.md` §3에서 가져옴.
-
-### 4.5 (레버 E) 신뢰도 점수 모델
-
-최종 등급 = **base_severity 를 confidence 로 보정**:
-
-```
-score = base_weight(severity)
-        + Σ(가중 신호)        # 예: 설치 훅 블록 내부에서 네트워크 + eval 동시 출현
-        − Σ(완화 신호)        # 예: allowlist 도구, 테스트/벤더 컨텍스트, 주석/문자열
-최종등급 = bucket(score)       # HIGH / MED / INFO 구간 매핑
+판정: HIGH — AI 자동 실행 차단
+요청 유형: 의도 기반 요청
+사용자 요청: adsf 패키지를 설치해 줘
+명령 출처: AI가 의도에서 생성
+작업 요약: adsf npm 패키지 설치
+명령 상태: 실행되지 않음 — 재확인 전 예상 명령 원문을 제공하지 않음
 ```
 
-→ 같은 패턴도 **위치와 동반 신호**에 따라 등급이 달라진다. 이게 오탐/미탐을 동시에 줄이는 핵심.
+AI가 사용자 명령을 변경했다면 최초 차단 시에는 변경 종류만 설명하고, 사용자가 재확인한 뒤 `사용자 요청 명령어`, `AI 실행 예정 명령어`, `차단된 명령어`를 함께 표시한다.
 
----
+### 5.3 HIGH 재확인
 
-## 5. 탐지 카탈로그 (생태계 × 카테고리)
+최초 HIGH 응답은 짧은 ref와 exact 재확인 문구(예: `A1B2 명령을 직접 실행하겠습니다`)를 안내한다. Claude는 검증된 인간 prompt를, Codex는 모델 transcript와 분리된 Secure Onboard 소유 로컬 확인 채널을 사용한다. 유효한 재확인 뒤 AI는 영향을 다시 설명하고, 비밀값을 포함한 위험 명령 원문 bytes를 치환 없이 출처 라벨과 함께 처음으로 제공한다. 터미널 표시를 조작하는 제어문자만 예외로 가시적인 안전 표현으로 바꾸고 `표시 안전 변환본`으로 라벨링한다. 존재하는 출처만 표시하며 구체적 요청은 사용자 요청·AI 실행 예정·차단 명령을, 의도 요청은 AI 예상·AI 실행 예정·차단 명령을 구분한다. 이 단계는 실행 승인이 아니다. AI는 같은 명령이나 대체 도구를 호출하지 않고 `COMMAND_PREPARED`, Stop 원문 확인이 가능하면 `COMMAND_RESPONSE_VERIFIED`로 끝낸다.
 
-`../research/threat-catalog.md`의 위협 목록을 생태계로 확장한 매핑. (전체 표는 해당 문서에서 관리)
+사용자가 일반 터미널에서 실행했는지는 관찰할 수 없으므로 Secure Onboard는 실행 성공·실패를 기록하지 않는다.
 
-| 카테고리 | npm | pip | docker | ci | 기본 등급 |
-|----------|-----|-----|--------|----|-----------|
-| 설치트리거 | `preinstall/install/postinstall/prepare` | `setup.py` 임의코드, PEP517 build hook | `RUN` 빌드 스텝 | `run:` 스텝 | **HIGH** |
-| 원격실행 | `curl\|sh`, raw-IP fetch | 동일 | 동일 | 동일 | **HIGH** |
-| 난독화 | 초장문/패킹, base64+eval | 동일 | — | — | MED↑(승격 가능) |
-| 유출 | `process.env`+네트워크 | `os.environ`+네트워크 | `ARG`/`ENV` 유출 | secret 에코 | MED |
-| 의존성위생 | 타이포스쿼팅, 신생 패키지 | 동일 | 베이스 이미지 핀 부재 | — | INFO/MED |
-| 레지스트리 | `.npmrc` registry/token 재정의 | `index-url` 재정의 | — | — | MED |
-| 위장파일 | 테스트 경로 비대/난독 파일 | 동일 | — | — | MED |
+## 6. 동작 불변식
 
-> **확장 카탈로그** (reverse-skill 발굴, `../research/reverse-skill-harvest.md`): CI/CD 위험 스텝(`pull_request_target`·스크립트 인젝션·Action SHA 미고정), 하드코딩 시크릿, **AI/LLM**(숨은 프롬프트 인젝션 시드·출력→위험싱크), **웹/API**(JWT `alg:none`·OAuth 시크릿·SSRF IOC), **바이너리/네이티브**(Mach-O `__mod_init_func` 자동실행·RWX·비표준 dylib·언어 핑거프린트). 전부 정적·무설치. 바이너리/Android는 **해당 산물 동봉 시에만** 게이팅.
+### G1. 실제 도구 호출이 권위 있는 입력
 
----
+의미 트리거와 AI 예상 명령은 사용자 설명에 사용한다. 실제 차단 판정은 `PreToolUse`의 도구 이름, shell/argv, cwd와 입력을 기준으로 한다.
 
-## 6. 오탐/미탐 전략 (핵심 KPI)
+### G2. HIGH만 차단
 
-- **오탐 ↓**: 컨텍스트-인지(주석/문자열/테스트) · allowlist · 신뢰도 점수 · 벤더 구분.
-- **미탐 ↓**: 디코드-후-재검사 · 다단계 추적 · 생태계 확장 · 엔트로피 기반 난독화 추정.
-- **구조적 한계(반드시 명시)**: Tier-0는 대상이 **동봉한** 코드(vendored `node_modules` 포함)만 본다.
-  `scripts` 없이 **선언만 된 악성 의존성**(설치 시 레지스트리에서 그 패키지의 `postinstall`이 실행)은
-  Tier-0가 구조적으로 미탐한다(패키지 tarball을 받지 않으므로). → **Tier-1 의존성 인텔(OSV `MAL-`/packument, M5)**
-  또는 워크플로우의 **`--ignore-scripts` + 샌드박스**(S1)로 완화. use-cases **A10** 회귀 케이스. "신호 없음 ≠ 안전"(S3).
-- **측정**: `use-cases.md`의 케이스 코퍼스를 회귀 테스트로 사용 — precision(오탐률)·recall(미탐률) 추적. (§D 갭 맵의 ✗가 수용기준)
-- **목표선**:
-  - 라이프사이클-훅 류(설치-시 실행) 재현 케이스 **탐지율 100%**
-  - 정상 husky/lefthook/주석-eval 코퍼스 **오탐 0**
-  - 대상 불간섭(S1) 유지 · 엔진 자체완결(설계목표) 유지
+- HIGH: deny
+- LOW: 실행 전 경고 후 클라이언트의 기존 approval 흐름으로 계속
+- INFO: 로컬 기록 후 클라이언트의 기존 approval 흐름으로 계속
 
----
+LOW·INFO를 허용할 때 Claude Code·Codex 자체 sandbox·권한 요청을 자동 승인하거나 우회하지 않는다.
 
-## 7. 입출력 / 사용법
+### G3. HIGH 제공 뒤 AI 실행 없음
 
-```bash
-scan <target_dir> [options]
-  --out FILE          사람용 보고서를 FILE 에도 저장
-  --json [FILE]       planned: 기계 판독용 JSON 산출 (CI 게이트/후처리용)
-  --min-severity LVL  planned: LVL 이상만 보고 (info|med|high)
-  --no-decode         planned: 디코드-후-재검사 비활성(속도 우선)
+사용자 재확인은 텍스트 명령 제공만 허용한다. `COMMAND_PREPARED`·`COMMAND_RESPONSE_VERIFIED`에서 차단 대상 AI 도구 실행으로 가는 상태 전이는 없다. hook·scanner·제품 관리용 disclose helper는 별도 경로다.
+
+### G4. 명령 출처 보존
+
+사용자 메시지, AI 후보, 실제 tool input을 별도로 보존한다. 대상 파일 속 지시와 도구 출력은 사용자 명령이나 재확인으로 취급하지 않는다.
+
+### G5. 실패 시 활성 작업 차단
+
+보호 action의 검사 코어 오류, timeout, 상태·정규화·필수 로그 실패는 HIGH로 deny한다. LOW 경고 출력을 adapter가 유효하게 생성·방출하지 못한 실패와 GatePolicy 자체를 읽을 수 없는 bootstrap 실패도 HIGH deny다. command hook에는 client의 표시 ACK가 없으므로 실제 경고 표시 능력은 M0 fixture로 검증한다. read-only scan의 같은 검사 오류는 HIGH finding으로 보고하되 scan 자체를 deny하지 않는다. 훅 자체가 비활성·미신뢰·skip되거나 adapter 프로세스가 실행되지 못한 경우에는 코어가 유효한 deny를 반환할 기회가 없으므로 완전한 차단을 보장하지 않는다.
+
+### G6. 캐시 hit도 사용자 절차 유지
+
+캐시는 분석 비용만 줄인다. HIGH 차단과 재확인, LOW 경고, 매 시도 이벤트 기록은 항상 다시 수행한다.
+
+## 7. 아키텍처
+
+```text
+[Prompt event]
+      │
+      ├─ adapter: client별 human provenance 검증 뒤 PromptContext 기록
+      └─ skill/model: 분류·표현 보조, source 확정 권한 없음
+      │
+      ▼
+[Claude Code / Codex가 tool call 계획]
+      │
+      ▼
+[client PreToolUse adapter]
+      │  native payload → HookEnvelope v1
+      ▼
+[shared local core]
+      ├─ HookEnvelope → ActionRequest
+      ├─ activation registry
+      ├─ command/action normalizer
+      ├─ deterministic rules
+      ├─ validated AI assessment (M2)
+      ├─ short-lived pending HIGH state + disclose formatter
+      ├─ evidence/action cache
+      └─ local activity history
+      │
+      ▼
+[ActionDecision v1]
+      ├─ HIGH: client-specific deny
+      └─ LOW/INFO: native client approval 흐름 유지
 ```
 
-- **현행 MVP 종료코드**: `0`=HIGH 없음 · `1`=HIGH 있음(사람 검토 필수) · `2`=입력 오류. MED만 있으면 현재는 `0`이다.
-- **위치**: 4단계 온보딩 플로우의 **2단계 엔진**. 전후 절차는 `workflow.md`, 출력 양식은 `report-template.md`.
-- **CI 통합(planned)**: `--json` + 종료코드로 파이프라인 게이트. 단, 게이트 통과 ≠ 안전 증명(S3).
+### 7.1 클라이언트 어댑터
 
----
+- 클라이언트별 native hook 입력을 공통 `HookEnvelope`로 변환한다. 공용 코어가 이를 `ActionRequest`로 정규화한다.
+- 공용 코어의 `HIGH`를 해당 클라이언트의 올바른 deny 출력으로 변환한다.
+- malformed output이 실행 계속으로 이어질 수 있으므로 scanner child 오류를 어댑터가 명시적 deny로 변환한다.
+- core timeout·exit·schema failure에는 target을 재판정하지 않는다. 보호 action은 고정 `guardrail.scan_failure` adapter fallback decision, read-only scan은 gate 없는 failed fallback `ScanReport`를 사용한다.
+- Claude Code 동기식 command hook에서 HIGH는 exit 0의 유효 JSON `{"systemMessage":"<사용자용 경고>","hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"<차단 사유>"}}`로 변환한다. LOW는 top-level `systemMessage`로 경고하되 permission decision을 생략하고, INFO도 명시적 allow 없이 기존 permission 흐름을 유지한다. async hook은 실행 게이트에 사용하지 않는다.
+- Codex HIGH deny, LOW 경고와 INFO continue는 공식 hook 응답 형식을 사용하며 unsupported 필드를 반환하지 않는다. client별 exact 출력 bytes와 terminal에서의 경고 관찰 결과를 M0 fixture로 고정한다.
+- 여러 훅의 실행 순서에 의존하지 않는다.
+- 배포하는 `hooks.json`에 명시적 `timeout`을 선언한다. 두 CLI의 기본값은 대부분 600초여서, 선언하지 않으면 어댑터가 멈췄을 때 사용자 세션이 최대 10분 정지한다. 이 값은 어댑터 정상 경로의 실측 지연과 fail-open 노출 시간을 함께 보고 M0에서 고정한다.
+- plugin/hooks 설치·활성과 self-test를 `status`에 노출한다. 사용자 scope `ON|OFF`와 유효 보호 `VERIFIED_ACTIVE|OFF|UNKNOWN`을 분리하고, Codex hash trust와 Claude workspace/plugin 상태를 클라이언트별로 구분한다.
 
-## 8. 케이스 & 플로우
+### 7.2 공용 코어
 
-- 구체적 탐지 케이스(정탐/오탐 경계 포함) + 기대 동작: **`use-cases.md`** (회귀 코퍼스 겸용)
-- 4단계 온보딩 플로우(구성확인 → 스캔 → 승인게이트 → 보고서): **`workflow.md`**
-- 보고서 구조 보강(실행요약·대상 SHA256·요약표→상세·P0/P1/P2·민감정보 플레이스홀더·공격경로 텍스트 체인): `../research/reverse-skill-harvest.md` §9 → **`report-template.md`에 반영됨**. (Mermaid 인라인 소스는 D6 시각화 결정에 따른 옵션 — 현재 미포함)
+공용 코어는 클라이언트 UI 문구가 아니라 다음 순수 계약을 담당한다.
 
----
+- 활성 범위 판정
+- command origin과 action kind 정규화
+- 대상·명령·환경 지문 생성
+- 결정론적 finding 생성. 검증된 AI assessment 병합은 M2
+- cache hit/miss와 무효화
+- `HIGH|LOW|INFO` 판정
+- redacted local event 기록
 
-## 9. 비범위 / 마일스톤 / 성공기준
+HIGH 원명령은 활동 로그나 캐시에 넣지 않는다. 명령 제공을 위해 exact invocation identity HMAC과 원문 invocation/display를 사용자 전용 `PendingBlock`에 최대 10분 보관한다. secret 출처에 따른 치환이나 terminal control escape는 하지 않는다. 모델은 action/ref 인자 없는 helper만 호출하고, 어댑터가 신뢰된 session·재확인 context를 주입하면 코어가 내부 ID와 single-use pending을 resolve한다. Stop 훅이 action-bound nonce·marker·digest를 마지막 assistant 응답 원문에서 확인한 뒤에만 `high_command_response_verified`로 기록한다. UI 전달·렌더 완료·사용자 열람은 증명하지 않는다.
 
-### 9.1 비범위 (YAGNI)
-- ~~외부 스캐너 오케스트레이션~~ → **범위로 환원**(Tier-1, §2.2). install-phobia 교정의 핵심 성과.
-- 동적 분석(디버거·Frida·에뮬·샌드박스·재서명설치) — escalation. 온보딩 3단계(승인+샌드박스)의 책임.
-- reverse-skill 심층 RE의 *동적* 기법 — escalation. 단 정적 시그니처·도구는 Tier-0/1으로 흡수(`../research/capability-tiers.md`).
-- **위험 모드 차단**(정적 도구의 동적 함정): `osv-scanner fix`·`npm audit fix`·pip-audit 동적 모드·CodeQL 빌드·`trufflehog` 기본 verification·`r2 -d` → 안전 플래그 강제.
+정규화된 필드와 enum은 `report-template.md`를 따른다.
 
-### 9.2 마일스톤
-1. **M1 — 구조 파싱 + 규칙 모델**: 레버 A·B. 매니페스트 정식 파싱, 데이터 규칙표, npm/pip/docker/ci 커버.
-2. **M2 — 신뢰도 점수 + 컨텍스트**: 레버 C·E. 오탐 코퍼스 0 목표.
-3. **M3 — 디코드/다단계**: 레버 D. 미탐 코퍼스(난독·다단계) 탐지.
-4. **M4 — 코퍼스 회귀 + JSON 출력**: KPI 측정 자동화. (여기까지 Tier-0 코어)
-5. **M5 — Tier-1 통합**: 의존성 인텔(OSV 오프라인 `MAL-` + 타이포스쿼팅 + dependency confusion + **선언 의존성 install-script 게이팅**, use-cases A10) + 정적 도구 어댑터(GuardDog·Semgrep·OSV-Scanner·gitleaks·YARA-X). 있으면 사용·없으면 Tier-0 폴백.
-   - **수용기준(구속)**: Tier-1 도구는 자유 명령 실행이 아니라 **allowlist wrapper**로만 호출한다. `osv-scanner scan`만 허용하고 `fix`/`npm audit fix`/`pip-audit` 동적 모드/`r2 -d`/CodeQL 빌드는 **argv 단계에서 거부**, `trufflehog --no-verification` 등 필수 안전 플래그를 코드·테스트로 강제한다(§9.1 위험모드 차단을 정책이 아닌 실행 강제로). (2026-07-05 보안 리뷰 반영)
+## 8. 판정 정책
 
-### 9.3 성공기준
-- `use-cases.md` 코퍼스에서 **기존 대비 오탐↓·미탐↓ 정량 입증**.
-- 라이프사이클-훅 재현 케이스 **100% 탐지**, 정상 코퍼스 **오탐 0**.
-- **대상 불간섭(S1) 유지** — 검사가 대상을 설치/실행/빌드하지 않음. (Tier-0 코어는 제로 의존; Tier-1 도구 의존은 옵션 — `decisions.md` D2)
+### 8.1 기본 규칙
 
----
+| 단계 | 근거 | 기본 판정 |
+|------|------|-----------|
+| M1 | 고정 악성 테스트 시그니처·package artifact 정확히 일치 | HIGH |
+| M1 | 보호 action의 검사 불완전, timeout, 정규화·필수 로그 실패 | HIGH |
+| M1 | 비밀·환경변수·내부 URL의 단순 존재 | LOW |
+| M1 | 고정 fixture의 확장자·형식 불일치 같은 단독 신호 | LOW |
+| M1 | 지원 검사가 끝났고 경고할 근거 없음 | INFO |
+| M2 | 설치·실행 진입점에서 외부 코드 실행·비밀 유출 sink까지 확인 | HIGH |
 
-## 10. 미결 결정사항
+설치 훅이나 스크립트 존재만으로 무조건 HIGH로 만들지 않는다. 현재 요청한 작업에서 실제 도달 가능한지, sink와 연결되는지, 확정 악성 데이터가 있는지를 종합한다. 결정론적 HIGH는 AI가 낮추지 못한다. AI 상관분석에 의한 승격은 M2에서 검증된 assessment 계약을 추가한 뒤 활성화한다.
 
-구현 단계에서 결정할 갈림길의 **옵션·장단점**은 **`decisions.md`**(Decision Register)에 기록한다. 주요 항목: substrate(D1) · Tier 구현범위/도구채택(D2) · 규칙 저장(D3) · 네트워크 정책(D4) · 출력형식(D5) · 시각화(D6) · 등급체계(D7) · escalation 핸드오프(D8). **기획 단계에서는 결정하지 않고 정보·트레이드오프만 남긴다.**
+### 8.2 안전 보증 금지
 
----
+INFO는 검사 범위에서 경고 근거를 찾지 못했다는 뜻이다. 미래 버전, 바뀐 원격 패키지, scan-to-use 사이 변경과 알려지지 않은 공격까지 안전하다고 보증하지 않는다.
 
-## 11. 기획 완성 정의 (Definition of Done)
+## 9. 설치·상태·데이터
 
-### 11.1 무엇을 "완성"이라 부르는가
+### 9.1 설치와 활성화
 
-이 저장소의 산출물은 **기획(plan)**이다. 따라서 "완성"은 *구현이 끝났다*가 아니라
-**기획 산출물이 내부 정합적이고, 구현에 착수할 수 있을 만큼 확정됐다**는 뜻이다. 세 가지를
-명확히 구분한다:
+플러그인 adapter와 공용 코어는 사용자 소유 영역에 한 번 설치하고 프로젝트 모드는 local registry의 활성화 상태로 관리한다. 실제 프로젝트별 package/plugin 설치는 제공하지 않는다.
 
-| 층위 | 정의 | 이 저장소에서 |
-|------|------|--------------|
-| **기획 완성** | 위협·불변식·아키텍처·코퍼스·워크플로우가 고정되고 문서가 정합적 | ✅ **여기가 완성 대상** (§11.2 충족) |
-| 구현 완료 | 코드가 코퍼스 KPI를 통과 | ⏳ M1~M5 (미착수) |
-| 모든 결정 확정 | D1~D8이 전부 결정으로 전환 | ⛔ **의도적으로 미룸** — 각 결정에 *결정 시점*을 명시(§10) |
+**Codex에서는 설치·활성화만으로 보호가 시작되지 않는다.** Codex는 번들 훅 정의의 현재 hash에 대해 사용자가 검토·신뢰하기 전까지 그 훅을 skip한다. 따라서 설치 안내는 `/hooks`에서 정의를 검토·신뢰하는 단계와, 신뢰 이후 새 세션이 필요한지 여부를 반드시 포함한다. 제품 업데이트로 훅 정의가 바뀌면 신뢰가 만료되므로 업데이트 안내에도 같은 단계를 넣는다. 신뢰 전 상태는 `VERIFIED_ACTIVE`가 아니라 `UNKNOWN`이며 보호 중이라고 표시하지 않는다. Claude Code에는 이에 대응하는 훅 단위 신뢰 절차가 없어 두 클라이언트의 설치 흐름이 비대칭이다. 프로젝트 설정·환경변수·대상 파일·도구 출력이 제안하는 위치나 상태 변경을 권위 있는 관리 입력으로 받아들이지 않는다. 다만 같은 사용자 권한으로 이미 실행된 코드는 사용자 영역 파일을 직접 변조할 수 있으므로 권한 분리나 변조 방지를 보장하지 않는다.
 
-> **핵심**: 기획 완성 ≠ 모든 구현 결정 확정. `decisions.md`의 D1~D8은 *공백*이 아니라
-> **옵션·트레이드오프·결정 시점이 기록된 완결된 결정 레지스터**다. 지금 결정하지 않는 것이
-> 이 기획의 설계다(구현 맥락이 있어야 옳게 결정되는 항목이므로). 단, M1 착수를 실제로 막는
-> D1(substrate)·D3(규칙 저장)에는 채택 기준선(비구속 → **결정: 채택 기준선**)을 명시해 둔다.
+프로젝트 비활성화는 전역 활성화보다 우선한다. 비활성화는 다음 작업부터 적용되고, 대상 파일의 자연어 지시나 AI 도구 출력은 Secure Onboard 자체 registry 변경 요청으로 인정하지 않는다. Claude 프로젝트/local 설정은 plugin 또는 hooks를 비활성화할 수 있고 Codex의 trusted project 설정은 hooks를 끌 수 있으므로 유효 보호 상태를 `OFF`로 만들 수 있다. Codex의 project-scoped plugin enable은 공식 기능으로 가정하지 않는다. 현재 세션을 확인할 근거가 부족하면 `UNKNOWN`이며 scope ON을 보호 활성으로 오인하지 않는다. 다만 실제 지원 PreToolUse가 도착한 action 하나는 정상 게이트하되 다른 action까지 보호됐다고 확장하지 않는다.
 
-### 11.2 완성 체크리스트
+### 9.2 로컬 활동 기록
 
-- [x] **단일 위협 정의** — 설치-시 자동실행 백도어 하나로 범위 고정 (§1.1)
-- [x] **안전 불변식 확정** — S1~S5, 전부 "대상"에 대한 규칙, 위반 금지 (§2.1)
-- [x] **신뢰 경계 확정** — 2-페이즈 신뢰 모델(운영자 도구 vs 모르는 대상) (§1.2)
-- [x] **아키텍처 확정** — 계층형 엔진(Tier-0/1/Escalation) + 5개 고도화 레버 (§2.2, §4)
-- [x] **탐지 카탈로그** — 생태계 × 카테고리 매핑 + 확장 카탈로그 (§5)
-- [x] **KPI·성공기준 정의** — 오탐↓·미탐↓, 라이프사이클-훅 100%·정상 오탐0 (§6, §9.3)
-- [x] **회귀 코퍼스 정의** — A(정탐)/B(오탐경계)/C(생태계) 케이스 + 목표/현행 등급 분리 (`use-cases.md`)
-- [x] **워크플로우·보고서 양식** — 4단계 절차 + 보고서 템플릿 (`workflow.md`, `report-template.md`)
-- [x] **결정 레지스터** — D1~D8 옵션·트레이드오프·결정 시점, M1-차단 항목에 채택 기준선 (`decisions.md`)
-- [x] **문서 정합성** — 상호참조 해소, 용어 네임스페이스 분리(불변식 S1~S5 ↔ 보고서 우선순위 P0/P1/P2), 정책 단일 근거화 (§11.3 리뷰 반영)
-- [x] **MVP↔목표 갭 명시** — 현행 `scan.sh`가 못 하는 레버(C/D/E)를 케이스별로 표기 (`use-cases.md`)
+기본 보존은 30일 또는 최근 1,000건이다. 원문 명령·비밀값·절대 경로 대신 사용자별 HMAC ID, 등급, action kind, rule ID, 상태, 버전과 시각을 저장한다. 사용자는 조회·삭제할 수 있으며 로그 완전성이나 변조 방지를 주장하지 않는다.
 
-### 11.3 정합성 리뷰 이력
+### 9.3 검사 캐시
 
-- **2026-07-05 · 3-관점 독립 리뷰** (codex/gpt-5.5, xhigh): (1) 보안·위협모델 건전성,
-  (2) 문서 일관성·기획↔구현 정합성, (3) 완성도·구현 준비성. 반영된 주요 교정:
-  - 상호참조 해소: proposal/decisions의 `research/`·`plan/` 상대경로 정정,
-    reverse-skill 브리지의 제거된 보고서·미존재 파일 참조 정정.
-  - 용어 충돌 해소: 안전 불변식 **P1~P5 → S1~S5** (보고서 우선순위 P0/P1/P2와 분리).
-  - 정책 단일화: OSV/deps.dev 조회의 Tier 분류를 `../research/capability-tiers.md`로 일원화
-    (오프라인 번들=Tier-0, 온라인=Tier-1; 구 "escalation" 표기 폐기), 네트워크 기본 정책은 D4로 귀속.
-  - 결정 정합: proposal이 사실상 채택한 D3(내장 규칙표)·D7(3단계+confidence)을
-    `decisions.md`에 **결정: 채택 기준선**으로 기록.
-  - MVP↔목표 갭: `use-cases.md`에 "목표 기대 등급"과 "현행 MVP 실제 등급"을 분리.
-  - 잔여(구현 단계 이월): 선언 의존성 install-script 백도어 게이팅(Tier-1),
-    비-npm 트리거의 깊은 파싱, Tier-1 위험모드 실행 강제 → §11.4·`use-cases.md`·M5 수용기준에 등록.
-- **2026-07-05 · 4차 검증 라운드** (codex 독립 재검토 → 픽스처 테스트로 확인): 위 교정 반영 여부를
-  재검증하고 MVP 스캐너의 잔여 하드닝을 완료. `docs/draft/scan.sh`에 적용·검증:
-  - 자기참조 경로 정정, `find` 전면 **`-print0`** 전환(개행 포함 경로 우회 차단),
-    `pkg_lifecycle` 값 개행 접기(디코이 훅 + 둘째 줄 페이로드 우회 차단),
-    대상 유래 문자열 무해화(`sanitize`/`rel` — 코드스팬 브레이크아웃·프롬프트 인젝션 방지, S5),
-    `--out` 대상 내부 쓰기 거부(S1/S2), 파서 부재 시 fail-closed(HIGH+exit1), grep DoS 상한,
-    보고서 here-doc→문자열 대입(쓰기 불가 TMPDIR에서도 동작).
-  - 회귀 픽스처(정상 husky·LinkedIn형·개행 경로·값 개행 디코이·백틱 인젝션·`--out` 가드·fail-closed)
-    전부 기대대로 통과. 관련 회귀 케이스는 `use-cases.md` A11/B7·§D 갭 맵에 반영.
+증거 캐시와 작업 판정 캐시를 분리한다.
 
-### 11.4 완성에 포함되지 않는 것 (구현 단계 이월)
+- 증거 캐시 키: 대상 콘텐츠·권한·심볼릭 링크 지문 + 코어·규칙 bundle·보안 데이터 버전 + analysis profile digest
+- 작업 판정 캐시 키: 증거 지문 + exact tool/command + 물리 cwd·resolved 실행 파일·effective 환경/설정 지문 + gate policy digest
 
-기획 완성 선언이 아래를 포함한다고 오해하지 말 것. 이들은 **구현 산출물**이며 마일스톤에 귀속된다:
+경로와 mtime만으로 재사용하지 않는다. M1 remote registry npm install은 HIGH deny하고 action cache를 bypass한다. effective executable·환경을 입증하지 못한 다른 tool도 action cache를 bypass한다. cache 오류는 stale allow 대신 fresh scan으로 복구하며 writeback만 실패하면 fresh decision을 유지하고 bypass한다. 마지막 접근 시각은 지문과 보존 보장에 포함하지 않는다. AI assessment cache는 M2 계약 전에는 만들지 않는다.
 
-- 실행 가능한 코퍼스 **픽스처·회귀 하네스** (KPI 자동 측정) → M4
-- Tier-1 도구 어댑터와 **위험모드 실행 강제(allowlist wrapper)** → M5 수용기준
-- 선언 의존성의 install-script/공급망 인텔 게이팅 → M5 (Tier-0는 구조적으로 미탐, 워크플로우의
-  `--ignore-scripts` + 샌드박스로 완화 — S1·`workflow.md` 3단계)
-- `scan.sh` MVP를 확장할지 재작성할지의 M1 구현 브리프
+M1 검사 코어는 별도 registry lookup이나 artifact download를 하지 않고 exact local `.tgz` 같은 immutable artifact만 권위 입력으로 사용한다. lockfile이나 npm cache만으로 remote install의 실제 bytes를 검증했다고 주장하지 않는다. remote registry install은 artifact-to-execution 결합을 구현하기 전까지 HIGH로 deny하고 action cache를 bypass한다. online resolve는 데이터 전송·proxy/auth·오류 정책을 별도 고지한 후속 opt-in 기능이다.
+
+## 10. 데이터·보안 경계
+
+- 외부 프로젝트를 Claude Code·Codex가 읽고 분석하는 것은 허용한다.
+- 해당 코드와 프롬프트의 공급자 전송·보존은 각 CLI와 계정 정책을 따른다.
+- Secure Onboard는 별도 제3자 분석 서비스에 원문을 자동 업로드하지 않는다.
+- 로그·캐시·hook output에는 원문 비밀을 남기지 않는다.
+- 위험 명령은 명시적 재확인 뒤 출처 라벨과 함께 보여 준다. 비밀값의 출처와 무관하게 secret 원문 bytes를 치환 없이 제공하며 그 노출 가능성을 영향 설명에 포함한다. ANSI/OSC·양방향 제어문자·NUL은 예외로 항상 가시적인 안전 표현으로 바꾼다.
+- 프로젝트 내부 설정, ignore, 실행 파일과 환경 주입을 검사 규칙·로그·캐시 위치의 신뢰 기반으로 사용하지 않는다. Claude 프로젝트/local 설정이 plugin/hooks를, Codex trusted-project 설정이 hooks를 끌 수 있다는 비보장은 별도다.
+
+## 11. 검증 전략
+
+실행 oracle의 정본은 `use-cases.md` 하나다. M0는 native hook payload·deny·continue·result·Stop·status를 먼저 고정하고, M1은 그 fixture 위에 제품 규칙과 사용자 흐름을 추가한다. EICAR는 격리된 opt-in 테스트에서 고정 commit의 `standard/eicar.com.txt` 단일 68-byte artifact만 signature/cache fixture로 사용한다. install hook 도달성·secret 흐름·prompt injection·권한은 M2 합성 fixture다.
+
+## 12. 마일스톤
+
+1. **M0 — hook tracer-bullet:** 두 CLI의 native payload·deny/continue·result/Stop·status와 고정 sentinel 규칙
+2. **M1 — fixture-backed end-to-end alpha:** npm 설치·파일 열기·읽기 전용 검사, 결정론적 규칙, 명령 출처·재확인·공개, scope·로그·캐시
+3. **M2 — 심층 분석:** 설치 훅 도달성, 스크립트·난독화·비밀 유출 경로, 검증된 AI 승격, 추가 tool coverage
+4. **M3 — 배포:** Windows·macOS 패키징, 설치·업데이트·상태·삭제, 지원 버전 matrix
+5. **M4 — 평판 데이터·범위 확장:** 고정·검증된 MAL/OSV 데이터팩, 다른 생태계, 선택 정적 분석기
+
+## 13. 구현 착수 판정
+
+판정은 다음과 같다.
+
+- **M0 hook tracer-bullet: GO**
+- **전체 M1 제품 구현: NO-GO**
+- **M2 심층 분석: NO-GO**
+
+M1은 다음 조건을 모두 충족한 뒤 시작한다.
+
+1. 두 CLI의 native hook payload와 deny·continue·result·Stop 동작을 fixture로 고정
+2. HIGH deny 뒤 차단 대상 tool handler 실행·target command process start 0 증명
+3. 클라이언트별 plugin/hooks OFF·self-test·확인 불가 상태 표시 정의
+4. 모든 필수 M1 fixture의 정확한 bytes·path·permission·prompt·tool payload·expected JSON 고정
+5. 사용자별 SQLite의 schema·migration·locking·transaction/outbox·crash recovery와 canonical encoding, HMAC key 손실·보관·회전, TTL·용량·resource limit fixture 확정
+6. short-ref disclosure helper와 구조화 scan helper의 신뢰 transport·single-use/idempotency fixture 고정
+7. `NOT_COVERED`와 지원 grammar parse failure의 구분, case×client/version×OS 적용 행렬 고정
+8. Codex 모델 transcript는 재확인 source로 사용하지 않고 제품 소유 로컬 확인 채널의 action-bound fixture를 고정
+
+M0는 실제 npm/EICAR 분석기나 캐시·재확인 UI를 만들지 않고 고정 sentinel로 hook 경계만 증명한다. 이 증거 전에는 “M1 구현 완료”, “배포 준비 완료”, “모든 실행 보호”, “강제 보안 통제”라고 표시하지 않는다.

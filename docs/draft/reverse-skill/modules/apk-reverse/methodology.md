@@ -1,6 +1,6 @@
 ---
 name: apk-reverse
-description: CLI 환경에서 Android APK 리버스 엔지니어링을 할 때 사용됩니다. APK 압축 풀기, Java 디컴파일, smali 수정, 재패키징, Frida 동적 후크 및 요청 시 so/native 분석으로 전환에 적합합니다. 이 머신에 설치된 jadx, apktool, frida, adb, ida-reverse, radare2를 사용하는 것이 우선적으로 적용됩니다.
+description: CLI 환경에서 Android APK 리버스 엔지니어링을 할 때 사용됩니다. APK 압축 풀기, Java 디컴파일, smali 수정, 재패키징, Frida 동적 후크 및 요청 시 so/native 분석으로 전환에 적합합니다. 실제 환경에서 사용 가능하다고 확인된 도구만 사용합니다.
 ---
 
 # APK 역방향 CLI 작업 사양
@@ -17,17 +17,19 @@ description: CLI 환경에서 Android APK 리버스 엔지니어링을 할 때 �
 - Frida를 사용하여 Java/native 동적 후크를 만듭니다.
 - APK에 `.so`가 포함된 경우 기본 분석으로 전환
 
-## 현재 기계는 검증된 CLI 도구를 사용할 수 있습니다.
+## 도구 사전 점검
 
-- `jadx` `1.5.5`
-- `apktool` `3.0.2`
-- `frida-ps` `17.9.6`
+- `jadx`
+- `apktool`
+- `frida-ps`
 - `adb`
 - `java`
 
-## 스크립트가 선호되는 시나리오
+명령을 실행하기 전에 `command -v`/`Get-Command`와 각 도구의 버전 명령으로 존재 여부를 확인하세요. 이 문서는 특정 머신에 설치됐다고 보장하지 않습니다.
 
-다음 프로세스는 빈도가 높으며 매개변수에 오류가 발생하기 쉽습니다. 스킬 자체 스크립트를 사용하는 것이 좋습니다.
+## 상류 스크립트 계약(현재 큐레이션에는 미포함)
+
+다음 이름은 상류 전체 패키지에서 사용하던 자동화 계약입니다. 현재 저장소에는 `scripts/`가 없으므로 아래 PowerShell 예시는 그대로 실행할 수 없습니다. 동일 작업은 검증된 CLI 명령으로 수행하거나 스크립트를 별도 도입한 뒤 사용하세요.
 
 - 한번에 완료 `jadx + apktool` 주문 및 요약 출력: `scripts/decode.ps1`
 - Frida 장치 확인, 프로세스 열거, spawn/attach 주입: `scripts/frida-run.ps1`
@@ -42,7 +44,7 @@ description: CLI 환경에서 Android APK 리버스 엔지니어링을 할 때 �
 - `jadx --version`
 - `apktool --version`
 
-## 스크립트와 함께 제공
+## 상류 스크립트 인터페이스 참고
 
 ### `scripts/decode.ps1`
 
@@ -250,12 +252,6 @@ Java 코드를 읽을 수 있는 경우 먼저 여기에서 비즈니스 로직�
 apktool b apktool_out -o rebuilt.apk
 ```
 
-또는 스크립트를 직접 사용하여 루프를 닫습니다.
-
-```powershell
-pwsh -File "<skill-root>\apk-reverse\scripts\rebuild-sign-install.ps1" -ProjectDir "apktool_out" -Install -Reinstall -DeviceSerial "127.0.0.1:7555"
-```
-
 설명:
 
 - 이 스킬은 `apktool` 링크 재설정만 보장합니다.
@@ -280,7 +276,7 @@ pwsh -File "<skill-root>\apk-reverse\scripts\rebuild-sign-install.ps1" -ProjectD
 제안:
 
 - 간단한 일회성 명령을 `frida-*`와 함께 직접 사용할 수 있습니다.
-- 주입 흐름을 안정적으로 재사용해야 하면 `scripts/frida-run.ps1`를 우선 사용합니다.
+- 주입 흐름을 재사용해야 하면 현재 저장소에 실제 스크립트를 추가하고 테스트한 뒤 사용합니다.
 
 ### 6. 네이티브 `.so` 전환
 
@@ -338,11 +334,11 @@ frida -U -f com.example.app -l hook.js
 
 ## 라우팅 컨텍스트
 
-**상류 입구**: `../../SKILL.md`(마스터 제어), `routing.md`
+**상류 입구**: `../../SKILL.md`(마스터 제어), `../../routing.md`
 **다운스트림 내보내기**:
 - 핵심 로직은 `.so` → `ida-reverse/` 또는 `radare2/`에 있습니다.
-- 동적 Hook/검증 필요 → `reverse-engineering/tools-dynamic.md` (Frida 장)
-- 보편적인 역방향 방법론 → `reverse-engineering/SKILL.md`
+- 동적 Hook/검증 필요 → `../reverse-engineering/tools-dynamic.md` (Frida 장)
+- 보편적인 역방향 방법론 → `../reverse-engineering/methodology.md`
 
 **유사한 연결 모듈**: `reverse-engineering/`(.so 분석 및 Frida 고급 사용)
 
@@ -350,28 +346,22 @@ frida -U -f com.example.app -l hook.js
 
 ## 주문형 부트스트랩
 
-해당 스킬의 진입 스크립트가 통합 부트스트래핑 시스템에 연결되었습니다. 도구가 누락되면 오류를 직접 보고하지 않고 자동으로 설치를 시도합니다.
+현재 큐레이션에는 설치·진입 스크립트가 포함되어 있지 않으므로 자동 설치를 시도하지 않습니다. 누락된 도구는 공식 배포 경로와 조직 정책에 따라 별도로 설치하고 버전을 기록하세요.
 
 ### 자동화 기능 경계
 
 | 도구| 자동으로 설치 가능| 설치방법| 설명|
 |------|-----------|---------|------|
-| jadx | ✓ | GitHub 릴리스 ZIP| `%USERPROFILE%\Tools\jadx\`로 자동 다운로드 및 압축 해제|
-| apktool | ✓ | GitHub 릴리스 JAR + 래퍼| 자동으로 jar를 다운로드하고 `%USERPROFILE%\Tools\apktool\`에 박쥐를 생성합니다.|
-| frida / frida-ps | ✓ | pip 설치 frida-tools| Python이 설치되어 있어야 합니다.|
-| adb | ✓ | 윙렛/대체 경로| Android 플랫폼 도구 자동 설치|
-| zipalign | ✗ |Android Build-Tools를 수동으로 설치해야 함| `sdkmanager "build-tools;35.0.0"` |
-| apksigner | ✗ |Android Build-Tools를 수동으로 설치해야 함| 위와 동일|
-
-### 부트스트랩 트리거 포인트
-
-- `scripts/decode.ps1`: jadx 또는 apktool이 없으면 `bootstrap-reverse.ps1`를 자동 호출합니다.
-- `scripts/rebuild-sign-install.ps1`: adb 또는 apktool이 없으면 부트스트랩을 자동 호출합니다.
-- `scripts/frida-run.ps1`: 현재는 수동 확인입니다(frida-tools pip 설치).
+| jadx | ✗ | 공식 릴리스 또는 패키지 관리자 | 설치 후 버전 확인 |
+| apktool | ✗ | 공식 릴리스 또는 패키지 관리자 | Java 필요 |
+| frida / frida-ps | ✗ | 공식 Python 패키지 설치 절차 | 클라이언트·서버 버전 호환 확인 |
+| adb | ✗ | Android SDK Platform-Tools | 대상 SDK와 기기 권한 확인 |
+| zipalign | ✗ | Android SDK Build-Tools | `sdkmanager --list`로 가용 버전을 확인하고 프로젝트가 요구하는 정확한 버전을 설치 |
+| apksigner | ✗ | Android SDK Build-Tools | `zipalign`과 같은 검증된 Build-Tools 버전 사용 |
 
 ### 부트스트래핑이 실패하는 경우
 
 일반적인 이유:
 - 네트워크 불통(GitHub API / PyPI 접근 불가)
-- Winget을 사용할 수 없습니다(Windows 버전이 너무 낮음).
+- 선택한 패키지 관리자를 사용할 수 없습니다.
 - Java가 설치되지 않았습니다(apktool은 JDK에 따라 다름).
