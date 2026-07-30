@@ -1,0 +1,226 @@
+{
+  "schema_version": "m0-harness-summary/v1",
+  "recorded_at": "2026-07-29T15:54:50Z",
+  "host": {
+    "os": "macos",
+    "os_version": "26.5.2",
+    "os_build": "25F84",
+    "architecture": "arm64",
+    "process_observer": "unavailable_operation_not_permitted",
+    "target_process_started": null,
+    "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+  },
+  "clients": {
+    "claude": {
+      "client": "claude",
+      "client_version": "2.1.220",
+      "manifest_relative_path": "tests/fixtures/m0/manifests/claude-2.1.220-macos-arm64.json",
+      "manifest_content_sha256": "sha256:fd5730989abb31001b5248286c59f1f0998fda4ee59f674915fd859e53b56e01",
+      "client_executable_sha256": "sha256:8addc857f3fe64d5a0368af9ee50321b50afb4a6918ba3ef018ab84f5dbbe081",
+      "client_runtime_artifact_sha256": "sha256:8addc857f3fe64d5a0368af9ee50321b50afb4a6918ba3ef018ab84f5dbbe081",
+      "product_hook_sha256": "sha256:f53ab36d3fa1a3a39cc5e9e2a0904edf0703d2835b44bf1f98a3c3b82c39719e",
+      "product_core_sha256": "sha256:584e97588742ef828bdaa350c915a9c242310efa93c1c879a2cd5aa880282b33"
+    },
+    "codex": {
+      "client": "codex",
+      "client_version": "0.146.0",
+      "manifest_relative_path": "tests/fixtures/m0/manifests/codex-0.146.0-macos-arm64.json",
+      "manifest_content_sha256": "sha256:69e8ed829cea907dc259f5296a807ad4fc16d54d74f728dd0dcdc069ecf57560",
+      "client_executable_sha256": "sha256:134063e133f0b4244fa3b251acf973d4fe4b4aeeacbdc135211bf480f59f1477",
+      "client_runtime_artifact_sha256": "sha256:ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02",
+      "product_hook_sha256": "sha256:f53ab36d3fa1a3a39cc5e9e2a0904edf0703d2835b44bf1f98a3c3b82c39719e",
+      "product_core_sha256": "sha256:584e97588742ef828bdaa350c915a9c242310efa93c1c879a2cd5aa880282b33"
+    }
+  },
+  "harness_runs": {
+    "claude_live": {
+      "harness_relative_path": "tests/native-harness/run-claude-m0.mjs",
+      "harness_content_sha256": "sha256:f3b536b30b15461c2878165e305b0f118d2fe9800c6270d3dfbb56f528bbfd1b",
+      "observation_scope": "final_product_artifact",
+      "source_output_sha256": "sha256:37578466e7f1668498cb2a6e9090c2d387451094e5b1c126adc3e77280dd2a8e",
+      "source_output_bytes": 6939,
+      "result_selectors": [
+        "/case_results/claude/live_markers"
+      ]
+    },
+    "codex_high": {
+      "harness_relative_path": "tests/native-harness/run-codex-m0.mjs",
+      "harness_content_sha256": "sha256:2ac7ffed9bb8f54d6da97d51e25ba1669aeed7c4bc35989ceec390c1280a45b4",
+      "observation_scope": "final_product_artifact",
+      "source_output_sha256": "sha256:7d8aafd7cb6df16adfd713840b66ab5b98b4a004d4555d439a9faf6f6db888b4",
+      "source_output_bytes": 1364,
+      "result_selectors": [
+        "/case_results/codex/live/effective_per_call_workdir_available",
+        "/case_results/codex/live/high_marker_exists",
+        "/case_results/codex/live/success_tool_response",
+        "/case_results/codex/live/system_message_in_exec_json"
+      ]
+    },
+    "codex_result_failure": {
+      "harness_relative_path": "tests/native-harness/run-codex-m0.mjs",
+      "harness_content_sha256": "sha256:2ac7ffed9bb8f54d6da97d51e25ba1669aeed7c4bc35989ceec390c1280a45b4",
+      "observation_scope": "final_product_artifact",
+      "source_output_sha256": "sha256:40506ce89444710832050c572a3da3c8a876412a7db84d295806bc4d9ae55f7f",
+      "source_output_bytes": 1365,
+      "result_selectors": [
+        "/case_results/codex/live/failure_tool_response",
+        "/case_results/codex/live/result_outcome"
+      ]
+    },
+    "adapter_faults": {
+      "harness_relative_path": "tests/native-harness/run-adapter-fault-observations.mjs",
+      "harness_content_sha256": "sha256:1e6035fd4f490b1b6b39dd488ac5536f6605f1e98af90554b5416fbddd730c0a",
+      "observation_scope": "client_native_boundary_no_product_claim",
+      "source_output_sha256": "sha256:1a905379661b2e96784a435a3154453bae341cb5c8ffad00b79fff8909cebf0b",
+      "source_output_bytes": 2206930,
+      "result_selectors": [
+        "/case_results/claude/adapter_faults",
+        "/case_results/codex/adapter_faults"
+      ]
+    },
+    "prompt_continuation": {
+      "harness_relative_path": "tests/native-harness/run-prompt-observations.mjs",
+      "harness_content_sha256": "sha256:87e0d9a9ae07e111fd7a9675a2ae74b62edeba49c9fa88785e933554aebb8990",
+      "observation_scope": "client_native_boundary_no_product_claim",
+      "source_output_sha256": "sha256:cbbce07b70d1e23f1e63ecbf7a63d5020420f45877162e9867fc50c0e341c1c0",
+      "source_output_bytes": 8636,
+      "result_selectors": [
+        "/case_results/codex/prompt_continuation"
+      ]
+    }
+  },
+  "case_results_sha256": "sha256:6f941fa4d96dd2e9c05c0c46bdbaf5da74f2006f09ebd33323c50200097a21d2",
+  "case_results": {
+    "claude": {
+      "client_version": "2.1.220",
+      "live_markers": {
+        "high_marker_exists": false,
+        "low_marker_exists": true,
+        "info_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      "adapter_faults": [
+        {
+          "case_id": "T05-D",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-E",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-F",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-G",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-I",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-J",
+          "target_marker_exists": false,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-K",
+          "target_marker_exists": false,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        }
+      ]
+    },
+    "codex": {
+      "client_version": "0.146.0",
+      "live": {
+        "effective_per_call_workdir_available": false,
+        "success_tool_response": "",
+        "failure_tool_response": "",
+        "result_outcome": "ambiguous_rejected",
+        "high_marker_exists": true,
+        "system_message_in_exec_json": false,
+        "interactive_ui": "unverified",
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      "adapter_faults": [
+        {
+          "case_id": "T05-D",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-E",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-F",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-G",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-H-Codex",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-I",
+          "target_marker_exists": true,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-J",
+          "target_marker_exists": false,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        },
+        {
+          "case_id": "T05-K",
+          "target_marker_exists": false,
+          "target_process_started": null,
+          "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+        }
+      ],
+      "prompt_continuation": {
+        "claude_user_prompt_submit_field": "prompt",
+        "claude_prompt_preserved_trailing_lf": true,
+        "user_prompt_submit_count": 1,
+        "stop_count": 2,
+        "stop_hook_active": [
+          false,
+          true
+        ],
+        "continuation_transport": "api_hook_prompt",
+        "second_user_prompt_submit_observed": false,
+        "provenance": "unverified"
+      }
+    }
+  }
+}

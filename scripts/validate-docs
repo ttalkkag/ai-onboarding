@@ -1,0 +1,1018 @@
+#!/usr/bin/env python3
+
+import argparse
+import html
+import json
+import os
+import re
+import sys
+import unicodedata
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
+
+
+ACTIVE_MARKDOWN = (
+    "README.md",
+    "CONTEXT.md",
+    "docs/system-prompt.md",
+    "docs/user-prompt.md",
+    "docs/plan/decisions.md",
+    "docs/plan/proposal.md",
+    "docs/plan/workflow.md",
+    "docs/plan/report-template.md",
+    "docs/plan/use-cases.md",
+    "docs/review/README.md",
+    "docs/review/hook-contract-and-decisions.md",
+)
+READINESS_MARKERS = {
+    "README.md": (
+        "M0 구현·관찰 완료",
+        "coverage 0",
+        "M1 NO-GO",
+    ),
+    "docs/plan/proposal.md": (
+        "M0 `OBSERVATION_COMPLETE_WITH_EXCLUSIONS`",
+        "coverage 0",
+        "M1 NO-GO",
+    ),
+    "docs/plan/decisions.md": (
+        "M0 `OBSERVATION_COMPLETE_WITH_EXCLUSIONS`",
+        "coverage 0",
+        "M1 NO-GO",
+    ),
+    "docs/plan/workflow.md": (
+        "M0 관찰 완료-with-exclusions",
+        "coverage는 0",
+        "M1 GO 전에 구현하지 않는다",
+    ),
+    "docs/plan/use-cases.md": (
+        "`OBSERVATION_COMPLETE_WITH_EXCLUSIONS`",
+        "`verified=0`",
+        "`included=0`",
+        "전체 구현은 시작하지 않는다",
+    ),
+    "docs/review/README.md": (
+        "M0 구현·관찰 완료-with-exclusions",
+        "coverage 0",
+        "M1 NO-GO",
+    ),
+}
+
+JSON_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*json[ \t]*$", re.IGNORECASE)
+FENCE_CLOSE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
+ANY_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,}).*$")
+INLINE_LINK = re.compile(r"!?\[[^\]\n]*\]\(([^)\n]+)\)")
+REFERENCE_LINK = re.compile(r"!?\[([^\]\n]+)\]\[([^\]\n]*)\]")
+REFERENCE_DEFINITION = re.compile(
+    r"^ {0,3}\[([^\]\n]+)\]:[ \t]*(<[^>\n]+>|[^ \t\n]+)"
+)
+INLINE_CODE = re.compile(r"(`+)(.+?)\1")
+ATX_HEADING = re.compile(r"^ {0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$")
+EXPLICIT_ANCHOR = re.compile(r"<a\b[^>]*\b(?:id|name)=[\"']([^\"']+)[\"']", re.IGNORECASE)
+HTML_TAG = re.compile(r"<[^>]+>")
+MARKDOWN_LINK_LABEL = re.compile(r"!?\[([^\]]+)\]\([^)]*\)")
+IGNORED_DIRECTORIES = {".git", "target"}
+ALLOWED_SEVERITIES = {"HIGH", "LOW", "INFO"}
+CONTROL_POLICY_REQUIREMENTS = {
+    "README.md": ("ANSI/OSC", "NUL", "`표시 안전 변환본`"),
+    "docs/plan/decisions.md": ("ANSI/OSC", "NUL", "`표시 안전 변환`"),
+    "docs/plan/proposal.md": ("ANSI/OSC", "NUL", "`표시 안전 변환`"),
+    "docs/plan/workflow.md": ("ANSI/OSC", "NUL", "`rendering=display_safe_reference`"),
+    "docs/plan/report-template.md": (
+        "ANSI/OSC",
+        "NUL",
+        "`display_safe_reference`",
+        '"control_escape"',
+    ),
+    "docs/plan/use-cases.md": (
+        "ANSI/OSC",
+        "NUL",
+        "`display_safe_reference`",
+        "`표시 안전 변환`",
+    ),
+    "docs/system-prompt.md": (
+        "사용자 지시로 복원된 항목",
+        "`display_safe_reference`",
+        "`control_escape`",
+    ),
+    "docs/review/hook-contract-and-decisions.md": (
+        "A1-Y. 제어문자 안전 변환 제거 — 회귀, 복원 완료",
+    ),
+}
+CONTROL_POLICY_FILES = (
+    "README.md",
+    "docs/plan/decisions.md",
+    "docs/plan/proposal.md",
+    "docs/plan/workflow.md",
+    "docs/plan/report-template.md",
+    "docs/plan/use-cases.md",
+)
+KNOWN_CONTROL_CONTRADICTIONS = (
+    "terminal control escape는 하지 않는다",
+    "escape·정규화 0",
+    "escape 없이",
+)
+LEGACY_SEVERITY = re.compile(r"\b(?:CRITICAL|MEDIUM|MED)\b")
+LEGACY_SEVERITY_ALLOWED_LINES = {
+    (
+        "CONTEXT.md",
+        "_Avoid_: 안전, 위험, MED, 프로젝트 승인",
+    ),
+    (
+        "CONTEXT.md",
+        "_Avoid_: MED, 조용한 허용",
+    ),
+    (
+        "docs/plan/decisions.md",
+        "복수 finding의 작업 판정은 가장 높은 등급을 사용한다. `MED`, `안전`, `위험`, "
+        "`조건부 승인`은 제품 판정으로 사용하지 않는다. `INFO`는 안전 보증이 아니다.",
+    ),
+    (
+        "docs/review/README.md",
+        "2026-07-22 이전 문서는 별도 설치 전 검사기, 공용 저장소 스킬, 프로젝트 단위 "
+        "`안전/위험`, `HIGH/MED/INFO`, AI의 대상 원문 접근 금지를 전제로 했다. "
+        "2026-07-26 공식 문서 재검증과 독립 계약 감사를 거쳐 정본을 다음 모델로 갱신했다.",
+    ),
+    (
+        "docs/review/README.md",
+        "- `MED`, `안전/위험`, scan의 `not_applicable ActionDecision`",
+    ),
+}
+RETIRED_SECRET_CANDIDATE = re.compile(
+    r"\b(?:SECURE_ONBOARD_REDACTED_SECRET|redacted_reference)\b"
+)
+RETIRED_SECRET_ALLOWED_LINES = {
+    (
+        "docs/system-prompt.md",
+        "- secret redaction 과거 후보(`SECURE_ONBOARD_REDACTED_SECRET` placeholder, "
+        "`redacted_reference`, `secret_rendering` 분기 스위치)가 active 계약에 남지 않음. "
+        "단 제어문자용 `display_safe_reference`·`control_escape`는 복원된 active 계약의 "
+        "고정 불변식이므로 제거 대상이 아니다",
+    ),
+}
+SECRET_RENDERING_VALUE = re.compile(
+    r'"secret_rendering"\s*:\s*"([^"]+)"|secret_rendering=([a-z0-9_]+)'
+)
+PROJECT_INSTALL_ASSERTION = re.compile(
+    r"프로젝트(?:별|마다| 단위(?:로|의)?)\s*(?:제품|package/plugin|플러그인)?\s*설치"
+    r"|프로젝트에\s*(?:제품|Secure Onboard)\s*설치"
+    r"|(?:per-project|project-local)\s+(?:product\s+)?install",
+    re.IGNORECASE,
+)
+PROJECT_INSTALL_NEGATIONS = (
+    "_Avoid_:",
+    "아니",
+    "않",
+    "금지",
+    "제공하지",
+    "만들지",
+    "과거 후보",
+    "오독",
+)
+M0_SCHEMA_KEYS = {
+    "m0-test-profile/v1": {
+        "schema_version",
+        "build_flavor",
+        "client",
+        "client_version",
+        "os",
+        "architecture",
+        "fixture_runtime",
+        "shell_binding",
+        "helpers",
+        "marker_root_relative",
+    },
+    "m0-action-request/v1": {
+        "schema_version",
+        "phase",
+        "test_case_id",
+        "test_run_id",
+        "test_profile_digest",
+        "action_id",
+        "envelope_id",
+        "client",
+        "session_fixture_id",
+        "native_tool_call_id",
+        "sentinel",
+        "invocation",
+        "physical_cwd_fixture",
+        "cwd_resolution_source",
+    },
+    "m0-action-decision/v1": {
+        "schema_version",
+        "phase",
+        "test_case_id",
+        "test_run_id",
+        "decision_id",
+        "action_id",
+        "client",
+        "session_fixture_id",
+        "native_tool_call_id",
+        "severity",
+        "gate_decision",
+        "rule_id",
+        "decision_source",
+        "failure_code",
+        "cache_status",
+        "pending_action_ref",
+    },
+    "m0-event/v1": {
+        "schema_version",
+        "phase",
+        "test_case_id",
+        "test_run_id",
+        "event_id",
+        "observed_at",
+        "event_type",
+        "client",
+        "session_fixture_id",
+        "action_id",
+        "native_tool_call_id",
+        "severity",
+        "rule_id",
+        "outcome",
+    },
+    "m0-status-report/v1": {
+        "schema_version",
+        "phase",
+        "report_source",
+        "test_case_id",
+        "test_run_id",
+        "client",
+        "client_version",
+        "plugin_version",
+        "os",
+        "architecture",
+        "client_executable",
+        "client_runtime_artifact",
+        "artifact_kind",
+        "artifact_digest",
+        "configured_scope_fixture",
+        "plugin_installed",
+        "hooks_enabled",
+        "client_mode_evidence",
+        "session_fixture_id",
+        "session_state",
+        "hook_evidence",
+        "bundled_hook_definition_digest",
+        "reviewed_hook_definition_digest",
+        "product_hook_review",
+        "heartbeat",
+        "self_test",
+        "client_trust",
+        "effective_protection",
+        "test_profile",
+        "test_profile_expected_digest",
+        "test_profile_supplied_digest",
+        "test_profile_rejection_reason",
+        "sentinel_binding_result",
+        "next_checks",
+        "run_evidence",
+        "artifact_inspection",
+        "reasons",
+        "limitations",
+    },
+    "m0-fixture-manifest/v1": {
+        "schema_version",
+        "client",
+        "client_version",
+        "os",
+        "architecture",
+        "client_executable",
+        "client_runtime_artifact",
+        "plugin_manifest",
+        "shipped_hooks_definition",
+        "product_artifact",
+        "core_artifact",
+        "test_profile",
+        "helper_fixtures",
+        "native_fixtures",
+    },
+}
+M0_NESTED_KEYS = {
+    ("m0-test-profile/v1", "fixture_runtime"): {
+        "executable_path",
+        "executable_sha256",
+        "version_output",
+    },
+    ("m0-test-profile/v1", "shell_binding"): {
+        "executable_path",
+        "executable_sha256",
+        "flags",
+        "dialect",
+        "resolution_fingerprint",
+    },
+    ("m0-action-request/v1", "invocation"): {
+        "kind",
+        "shell_executable",
+        "shell_flags",
+        "dialect",
+        "command_text",
+        "shell_resolution_source",
+        "shell_resolution_fingerprint",
+    },
+    ("m0-status-report/v1", "client_executable"): {
+        "invoked_path",
+        "resolved_path",
+        "sha256",
+        "version_output",
+    },
+    ("m0-status-report/v1", "client_runtime_artifact"): {
+        "role",
+        "absolute_path",
+        "sha256",
+    },
+    ("m0-status-report/v1", "client_mode_evidence"): {
+        "plugin_state",
+        "launch_mode",
+        "explicit_plugin_supplied",
+        "disable_all_hooks",
+        "codex_hooks_feature",
+        "setting_evidence",
+        "evidence_digest",
+    },
+    ("m0-status-report/v1", "heartbeat"): {
+        "status",
+        "evidence_scope",
+        "session_fixture_id",
+        "hook_source",
+        "hook_definition_digest",
+    },
+    ("m0-status-report/v1", "self_test"): {
+        "status",
+        "evidence_scope",
+        "session_fixture_id",
+        "hook_source",
+        "hook_definition_digest",
+    },
+    ("m0-status-report/v1", "run_evidence"): {
+        "object_counts",
+        "canonical_digests",
+        "ordered_events",
+        "observations",
+    },
+    ("m0-fixture-manifest/v1", "client_executable"): {
+        "invoked_path",
+        "resolved_path",
+        "sha256",
+        "version_output",
+    },
+    ("m0-fixture-manifest/v1", "client_runtime_artifact"): {
+        "role",
+        "absolute_path",
+        "sha256",
+    },
+    ("m0-fixture-manifest/v1", "plugin_manifest"): {
+        "absolute_path",
+        "sha256",
+    },
+    ("m0-fixture-manifest/v1", "shipped_hooks_definition"): {
+        "absolute_path",
+        "sha256",
+    },
+    ("m0-fixture-manifest/v1", "product_artifact"): {
+        "absolute_path",
+        "sha256",
+        "compiled_test_profile_sha256",
+    },
+    ("m0-fixture-manifest/v1", "core_artifact"): {
+        "absolute_path",
+        "sha256",
+    },
+    ("m0-fixture-manifest/v1", "test_profile"): {
+        "relative_path",
+        "content_sha256",
+    },
+}
+M0_DEEP_NESTED_KEYS = {
+    ("m0-status-report/v1", "run_evidence", "object_counts"): {
+        "hook_envelope",
+        "m0_action_request",
+        "m0_action_decision",
+        "m0_event",
+        "m0_status_report",
+    },
+    ("m0-status-report/v1", "run_evidence", "canonical_digests"): {
+        "hook_envelope",
+        "m0_action_request",
+        "m0_action_decision",
+        "m0_event",
+    },
+    ("m0-status-report/v1", "run_evidence", "observations"): {
+        "target_process_start_count",
+        "target_marker_count",
+        "operator_approval_count",
+        "secure_onboard_approval_count",
+        "uncorrelated_result_count",
+    },
+}
+M0_ARRAY_ITEM_KEYS = {
+    ("m0-test-profile/v1", "helpers"): {
+        "role",
+        "relative_path",
+        "content_sha256",
+        "command_grammar",
+        "allowed_sentinels",
+    },
+    ("m0-status-report/v1", "hook_evidence"): {
+        "source",
+        "definition_digest",
+        "disposition",
+        "reason",
+    },
+    ("m0-fixture-manifest/v1", "helper_fixtures"): {
+        "role",
+        "relative_path",
+        "content_sha256",
+    },
+    ("m0-fixture-manifest/v1", "native_fixtures"): {
+        "role",
+        "relative_path",
+        "content_sha256",
+        "canonical_json_sha256",
+    },
+}
+
+
+class DuplicateKey(ValueError):
+    pass
+
+
+def reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    value: dict[str, object] = {}
+    for key, item in pairs:
+        if key in value:
+            raise DuplicateKey(f"duplicate object key: {key}")
+        value[key] = item
+    return value
+
+
+def reject_nonstandard_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON constant: {value}")
+
+
+def markdown_paths(root: Path) -> list[Path]:
+    paths = []
+    for path in root.rglob("*.md"):
+        relative = path.relative_to(root)
+        if path.is_file() and not any(part in IGNORED_DIRECTORIES for part in relative.parts):
+            paths.append(path)
+    return sorted(paths, key=lambda path: path.relative_to(root).as_posix())
+
+
+def json_fences(path: Path, text: str) -> tuple[list[tuple[int, str]], list[str]]:
+    fences: list[tuple[int, str]] = []
+    errors: list[str] = []
+    lines = text.splitlines(keepends=True)
+    index = 0
+    while index < len(lines):
+        opening = JSON_FENCE.match(lines[index].rstrip("\r\n"))
+        if opening is None:
+            index += 1
+            continue
+
+        fence = opening.group(1)
+        start_line = index + 1
+        body: list[str] = []
+        index += 1
+        while index < len(lines):
+            closing = FENCE_CLOSE.match(lines[index].rstrip("\r\n"))
+            if (
+                closing is not None
+                and closing.group(1)[0] == fence[0]
+                and len(closing.group(1)) >= len(fence)
+            ):
+                fences.append((start_line, "".join(body)))
+                break
+            body.append(lines[index])
+            index += 1
+        else:
+            errors.append(f"line {start_line}: unclosed fenced JSON block")
+            break
+        index += 1
+    return fences, errors
+
+
+def severity_errors(value: object, location: str = "$") -> list[str]:
+    errors: list[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            item_location = f"{location}.{key}"
+            if (key == "severity" or key.endswith("_severity")) and (
+                not isinstance(item, str) or item not in ALLOWED_SEVERITIES
+            ):
+                errors.append(f"{item_location}: invalid severity enum: {item}")
+            errors.extend(severity_errors(item, item_location))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            errors.extend(severity_errors(item, f"{location}[{index}]"))
+    return errors
+
+
+def validate_fenced_json(root: Path, paths: list[Path]) -> tuple[list[str], int]:
+    errors: list[str] = []
+    count = 0
+    for path in paths:
+        relative = path.relative_to(root).as_posix()
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeError as error:
+            errors.append(f"{relative}: Markdown is not valid UTF-8: {error}")
+            continue
+        fences, fence_errors = json_fences(path, text)
+        errors.extend(f"{relative}:{error}" for error in fence_errors)
+        for line, payload in fences:
+            count += 1
+            try:
+                value = json.loads(
+                    payload,
+                    object_pairs_hook=reject_duplicate_keys,
+                    parse_constant=reject_nonstandard_constant,
+                )
+            except (json.JSONDecodeError, ValueError) as error:
+                errors.append(f"{relative}:{line}: invalid fenced JSON: {error}")
+                continue
+            if relative in ACTIVE_MARKDOWN:
+                errors.extend(
+                    f"{relative}:{line}: {error}" for error in severity_errors(value)
+                )
+    return errors, count
+
+
+def prose_lines(text: str) -> list[tuple[int, str]]:
+    lines: list[tuple[int, str]] = []
+    open_fence: str | None = None
+    for number, line in enumerate(text.splitlines(), start=1):
+        fence = ANY_FENCE.match(line)
+        if open_fence is not None:
+            if (
+                fence is not None
+                and fence.group(1)[0] == open_fence[0]
+                and len(fence.group(1)) >= len(open_fence)
+            ):
+                open_fence = None
+            continue
+        if fence is not None:
+            open_fence = fence.group(1)
+            continue
+        lines.append((number, line))
+    return lines
+
+
+def link_destination(raw: str) -> str:
+    raw = raw.strip()
+    if raw.startswith("<"):
+        end = raw.find(">")
+        return raw[1:end] if end >= 0 else raw
+    return raw.split(maxsplit=1)[0]
+
+
+def reference_label(raw: str) -> str:
+    return " ".join(raw.split()).casefold()
+
+
+def mask_inline_code(line: str) -> str:
+    return INLINE_CODE.sub(lambda match: " " * len(match.group(0)), line)
+
+
+def resolve_local_link(root: Path, source: Path, destination: str) -> tuple[Path | None, str]:
+    parsed = urlsplit(destination)
+    if parsed.scheme or destination.startswith("//"):
+        return None, ""
+    decoded = unquote(parsed.path)
+    if not decoded:
+        return source, unquote(parsed.fragment)
+    if decoded.startswith("/"):
+        return root / decoded.removeprefix("/"), unquote(parsed.fragment)
+    return source.parent / decoded, unquote(parsed.fragment)
+
+
+def github_slug(heading: str) -> str:
+    heading = html.unescape(heading)
+    heading = MARKDOWN_LINK_LABEL.sub(r"\1", heading)
+    heading = HTML_TAG.sub("", heading)
+    heading = heading.replace("`", "").replace("*", "").replace("~", "")
+    slug = []
+    for character in heading.strip().lower():
+        category = unicodedata.category(character)
+        if character.isspace():
+            slug.append("-")
+        elif character in "-_" or category[0] in {"L", "M", "N"}:
+            slug.append(character)
+    return "".join(slug)
+
+
+def markdown_anchors(text: str) -> set[str]:
+    anchors: set[str] = set()
+    slug_counts: dict[str, int] = {}
+    for _, line in prose_lines(text):
+        for explicit in EXPLICIT_ANCHOR.findall(line):
+            anchors.add(explicit)
+        heading = ATX_HEADING.match(line)
+        if heading is None:
+            continue
+        base = github_slug(heading.group(1))
+        suffix = slug_counts.get(base, 0)
+        slug_counts[base] = suffix + 1
+        anchors.add(base if suffix == 0 else f"{base}-{suffix}")
+    return anchors
+
+
+def path_case_matches(root: Path, target: Path) -> bool | None:
+    lexical = Path(os.path.normpath(str(target.absolute())))
+    if not lexical.is_relative_to(root):
+        return None
+    current = root
+    for part in lexical.relative_to(root).parts:
+        try:
+            names = [entry.name for entry in current.iterdir()]
+        except OSError:
+            return None
+        if part in names:
+            current /= part
+            continue
+        if any(name.casefold() == part.casefold() for name in names):
+            return False
+        return None
+    return True
+
+
+def validate_local_links(root: Path, paths: list[Path]) -> tuple[list[str], int]:
+    errors: list[str] = []
+    count = 0
+    anchor_cache: dict[Path, set[str]] = {}
+    for source in paths:
+        if not source.is_file():
+            continue
+        relative = source.relative_to(root).as_posix()
+        text = source.read_text(encoding="utf-8")
+        lines = prose_lines(text)
+        definitions = {}
+        for _, line in lines:
+            definition = REFERENCE_DEFINITION.match(line)
+            if definition is not None:
+                definitions[reference_label(definition.group(1))] = link_destination(
+                    definition.group(2)
+                )
+        for line_number, line in lines:
+            masked_line = mask_inline_code(line)
+            destinations = [
+                link_destination(match.group(1))
+                for match in INLINE_LINK.finditer(masked_line)
+            ]
+            for match in REFERENCE_LINK.finditer(masked_line):
+                label = match.group(2) or match.group(1)
+                normalized_label = reference_label(label)
+                destination = definitions.get(normalized_label)
+                if destination is None:
+                    errors.append(
+                        f"{relative}:{line_number}: reference link definition "
+                        f"does not exist: {label}"
+                    )
+                    continue
+                destinations.append(destination)
+            for destination in destinations:
+                target, fragment = resolve_local_link(root, source, destination)
+                if target is None:
+                    continue
+                count += 1
+                normalized = target.resolve(strict=False)
+                if not normalized.is_relative_to(root):
+                    errors.append(
+                        f"{relative}:{line_number}: local link escapes repository: {destination}"
+                    )
+                elif path_case_matches(root, target) is False:
+                    errors.append(
+                        f"{relative}:{line_number}: link path casing does not match: "
+                        f"{destination}"
+                    )
+                elif not normalized.exists():
+                    errors.append(
+                        f"{relative}:{line_number}: link target does not exist: {destination}"
+                    )
+                elif fragment and normalized.suffix.lower() in {"", ".md", ".markdown"}:
+                    if normalized not in anchor_cache:
+                        try:
+                            target_text = normalized.read_text(encoding="utf-8")
+                        except (OSError, UnicodeError) as error:
+                            errors.append(
+                                f"{relative}:{line_number}: cannot read anchor target "
+                                f"{destination}: {error}"
+                            )
+                            continue
+                        anchor_cache[normalized] = markdown_anchors(target_text)
+                    if fragment not in anchor_cache[normalized]:
+                        errors.append(
+                            f"{relative}:{line_number}: link anchor does not exist: "
+                            f"{destination}"
+                        )
+    return errors, count
+
+
+def validate_user_prompt(root: Path) -> tuple[list[str], int]:
+    relative = "docs/user-prompt.md"
+    path = root / relative
+    if not path.is_file():
+        return [], 0
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeError as error:
+        return [f"{relative}: user prompt is not valid UTF-8: {error}"], 0
+    character_count = len(text.rstrip("\r\n"))
+    if character_count > 1500:
+        return [
+            f"{relative}: user prompt exceeds 1500 characters: {character_count}"
+        ], character_count
+    return [], character_count
+
+
+def validate_control_policy(root: Path) -> list[str]:
+    errors: list[str] = []
+    documents: dict[str, str] = {}
+    for relative, required_phrases in CONTROL_POLICY_REQUIREMENTS.items():
+        path = root / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        documents[relative] = text
+        for phrase in required_phrases:
+            if phrase not in text:
+                errors.append(
+                    f"{relative}: restored control-byte wording is missing: {phrase}"
+                )
+    for relative in CONTROL_POLICY_FILES:
+        text = documents.get(relative)
+        if text is None:
+            continue
+        for contradiction in KNOWN_CONTROL_CONTRADICTIONS:
+            if contradiction in text:
+                errors.append(
+                    f"{relative}: known control-byte contradiction is present: "
+                    f"{contradiction}"
+                )
+    return errors
+
+
+def validate_readiness(root: Path) -> list[str]:
+    errors: list[str] = []
+    for relative, markers in READINESS_MARKERS.items():
+        path = root / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                errors.append(
+                    f"{relative}: readiness marker is missing: {marker}"
+                )
+    return errors
+
+
+def validate_legacy_severity(root: Path) -> list[str]:
+    errors: list[str] = []
+    for relative in ACTIVE_MARKDOWN:
+        path = root / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for line_number, line in prose_lines(text):
+            matches = LEGACY_SEVERITY.findall(line)
+            if not matches or (relative, line) in LEGACY_SEVERITY_ALLOWED_LINES:
+                continue
+            for severity in sorted(set(matches)):
+                errors.append(
+                    f"{relative}:{line_number}: legacy severity is asserted outside "
+                    f"an allowed historical context: {severity}"
+                )
+    return errors
+
+
+def validate_secret_policy_candidates(root: Path) -> list[str]:
+    errors: list[str] = []
+    for relative in ACTIVE_MARKDOWN:
+        path = root / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            matches = RETIRED_SECRET_CANDIDATE.findall(line)
+            allowed_historical_line = (relative, line) in RETIRED_SECRET_ALLOWED_LINES
+            if matches and not allowed_historical_line:
+                for candidate in sorted(set(matches)):
+                    errors.append(
+                        f"{relative}:{line_number}: retired secret redaction candidate "
+                        f"is asserted: {candidate}"
+                    )
+            if "secret_rendering" in line and not allowed_historical_line:
+                values = [
+                    first or second
+                    for first, second in SECRET_RENDERING_VALUE.findall(line)
+                ]
+                if not values or any(value != "literal_all" for value in values):
+                    errors.append(
+                        f"{relative}:{line_number}: secret_rendering branch is not "
+                        "fixed to literal_all"
+                    )
+    return errors
+
+
+def validate_project_install_policy(root: Path) -> list[str]:
+    errors: list[str] = []
+    for relative in ACTIVE_MARKDOWN:
+        path = root / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for line_number, line in prose_lines(text):
+            if (
+                PROJECT_INSTALL_ASSERTION.search(line)
+                and not any(marker in line for marker in PROJECT_INSTALL_NEGATIONS)
+            ):
+                errors.append(
+                    f"{relative}:{line_number}: project-local product installation "
+                    "is asserted"
+                )
+    return errors
+
+
+def exact_key_errors(schema: str, label: str, value: object, expected: set[str]) -> list[str]:
+    if not isinstance(value, dict):
+        return [f"{schema} {label} must be a JSON object"]
+    missing = sorted(expected.difference(value))
+    unexpected = sorted(set(value).difference(expected))
+    errors = []
+    if missing:
+        errors.append(f"{schema} {label} is missing keys: {', '.join(missing)}")
+    if unexpected:
+        errors.append(f"{schema} {label} has unexpected keys: {', '.join(unexpected)}")
+    return errors
+
+
+def validate_m0_schema_examples(root: Path) -> list[str]:
+    relative = "docs/plan/report-template.md"
+    path = root / relative
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    fences, _ = json_fences(path, text)
+    examples: dict[str, list[tuple[int, dict[str, object]]]] = {
+        schema: [] for schema in M0_SCHEMA_KEYS
+    }
+    errors: list[str] = []
+    for line, payload in fences:
+        try:
+            value = json.loads(
+                payload,
+                object_pairs_hook=reject_duplicate_keys,
+                parse_constant=reject_nonstandard_constant,
+            )
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(value, dict):
+            continue
+        schema = value.get("schema_version")
+        if isinstance(schema, str) and schema.startswith("m0-"):
+            if schema not in examples:
+                errors.append(f"{relative}:{line}: unexpected M0 schema example: {schema}")
+            else:
+                examples[schema].append((line, value))
+
+    for schema, expected_keys in M0_SCHEMA_KEYS.items():
+        matches = examples[schema]
+        if len(matches) != 1:
+            errors.append(
+                f"{relative}: {schema} expected exactly one top-level example, "
+                f"found {len(matches)}"
+            )
+            continue
+        line, value = matches[0]
+        prefix = f"{relative}:{line}: "
+        errors.extend(
+            prefix + error
+            for error in exact_key_errors(schema, "example", value, expected_keys)
+        )
+        for (nested_schema, field), nested_keys in M0_NESTED_KEYS.items():
+            if nested_schema != schema or field not in value:
+                continue
+            errors.extend(
+                prefix + error
+                for error in exact_key_errors(
+                    schema, f"example.{field}", value[field], nested_keys
+                )
+            )
+        for (item_schema, field), item_keys in M0_ARRAY_ITEM_KEYS.items():
+            if item_schema != schema or field not in value:
+                continue
+            items = value[field]
+            if not isinstance(items, list):
+                errors.append(f"{prefix}{schema} example.{field} must be a JSON array")
+                continue
+            for index, item in enumerate(items):
+                errors.extend(
+                    prefix + error
+                    for error in exact_key_errors(
+                        schema, f"example.{field}[{index}]", item, item_keys
+                    )
+                )
+        for (deep_schema, parent, field), nested_keys in M0_DEEP_NESTED_KEYS.items():
+            if deep_schema != schema or parent not in value:
+                continue
+            parent_value = value[parent]
+            if not isinstance(parent_value, dict) or field not in parent_value:
+                errors.append(f"{prefix}{schema} example.{parent}.{field} is missing")
+                continue
+            errors.extend(
+                prefix + error
+                for error in exact_key_errors(
+                    schema,
+                    f"example.{parent}.{field}",
+                    parent_value[field],
+                    nested_keys,
+                )
+            )
+
+        if schema == "m0-test-profile/v1":
+            helpers = value.get("helpers")
+            if isinstance(helpers, list) and len(helpers) == 2:
+                roles = [helper.get("role") for helper in helpers if isinstance(helper, dict)]
+                sentinels = [
+                    helper.get("allowed_sentinels")
+                    for helper in helpers
+                    if isinstance(helper, dict)
+                ]
+                if roles != ["default", "failure"]:
+                    errors.append(
+                        f"{prefix}{schema} helpers must be ordered default, failure"
+                    )
+                if sentinels != [["high", "low", "info"], ["low", "info"]]:
+                    errors.append(
+                        f"{prefix}{schema} helper sentinel allow-lists do not match"
+                    )
+            else:
+                errors.append(f"{prefix}{schema} helpers must contain exactly two items")
+        elif schema == "m0-fixture-manifest/v1":
+            ordered_roles = {
+                "helper_fixtures": ["default", "failure", "near_match"],
+                "native_fixtures": [
+                    "prompt",
+                    "pre_tool_use",
+                    "result_success",
+                    "result_failure",
+                    "stop",
+                ],
+            }
+            for field, expected_roles in ordered_roles.items():
+                items = value.get(field)
+                roles = (
+                    [item.get("role") for item in items if isinstance(item, dict)]
+                    if isinstance(items, list)
+                    else []
+                )
+                if roles != expected_roles:
+                    errors.append(
+                        f"{prefix}{schema} {field} roles do not match the required order"
+                    )
+    return errors
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Validate the active documentation contract.")
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
+    args = parser.parse_args()
+    root = args.root.resolve()
+
+    errors = [
+        f"{relative}: required active Markdown file is missing"
+        for relative in ACTIVE_MARKDOWN
+        if not (root / relative).is_file()
+    ]
+    paths = markdown_paths(root)
+    json_errors, json_count = validate_fenced_json(root, paths)
+    errors.extend(json_errors)
+    active_paths = [root / relative for relative in ACTIVE_MARKDOWN]
+    link_errors, link_count = validate_local_links(root, active_paths)
+    errors.extend(link_errors)
+    prompt_errors, prompt_count = validate_user_prompt(root)
+    errors.extend(prompt_errors)
+    errors.extend(validate_readiness(root))
+    errors.extend(validate_legacy_severity(root))
+    errors.extend(validate_secret_policy_candidates(root))
+    errors.extend(validate_project_install_policy(root))
+    errors.extend(validate_control_policy(root))
+    errors.extend(validate_m0_schema_examples(root))
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
+
+    print(
+        "docs contract: ok "
+        f"({len(ACTIVE_MARKDOWN)} active Markdown files, "
+        f"{json_count} fenced JSON examples, {link_count} local links, "
+        f"user prompt {prompt_count}/1500 characters)"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

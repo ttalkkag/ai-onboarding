@@ -2,7 +2,7 @@
 
 이 문서는 사용자와 합의한 제품 정책의 정본이다. 구현 세부 설명은 `proposal.md`, 상태 전이는 `workflow.md`, 필드 계약은 `report-template.md`를 따른다.
 
-- 제품 상태: **M0 hook tracer-bullet GO / 전체 M1 NO-GO**
+- 제품 상태: **M0 `OBSERVATION_COMPLETE_WITH_EXCLUSIONS`(검증된 보호 coverage 0) / 전체 M1 NO-GO**
 - 기준일: 2026-07-26
 - 등급 표기: `HIGH`, `LOW`, `INFO`만 허용
 
@@ -83,7 +83,7 @@ Claude Code 자체는 `user`, `project`, `local` plugin scope를 지원한다. S
 
 의미 트리거는 설명과 명령 출처 구분을 위한 보조 입력이다. 실제 차단의 권위 있는 입력은 `PreToolUse`가 받은 실행 직전 도구 이름과 인자다. prompt event는 클라이언트별 provenance가 실제 인간 제출로 검증된 경우에만 사용자 명령·재확인의 권위 있는 source로 사용한다. Codex 공식 `UserPromptSubmit`에는 인간 입력을 자동 continuation과 구분하는 provenance 필드가 없으므로 기본값은 `unverified`다. Codex의 HIGH 재확인은 모델 transcript와 분리된 Secure Onboard 소유 로컬 확인 채널에서만 받고 session·action·short ref·context fingerprint·TTL에 결합한다. 이 채널을 지원하지 못하는 client/version/OS는 Codex HIGH 명령 공개 coverage에 포함하지 않는다.
 
-`PermissionRequest`는 원래 승인 요청이 없는 호출을 놓칠 수 있으므로 1차 게이트로 사용하지 않는다. 결과 훅은 이미 실행된 LOW·INFO 작업 결과 기록에만 사용하며, Claude Code의 `PostToolUse`/`PostToolUseFailure`와 Codex의 `PostToolUse`를 어댑터가 공통 success/failure로 정규화한다.
+`PermissionRequest`는 원래 승인 요청이 없는 호출을 놓칠 수 있으므로 1차 게이트로 사용하지 않는다. 결과 훅은 이미 실행된 LOW·INFO 작업 결과 기록에만 사용한다. Claude Code는 `PostToolUse`/`PostToolUseFailure`를 공통 success/failure로 정규화한다. Codex는 지원 exact version의 `PostToolUse`가 outcome과 nullable exit code를 신뢰할 수 있게 구분하는 fixture를 제공할 때만 결과 coverage에 포함한다. Codex CLI 0.146.0에서는 success와 exit 23 failure가 모두 `tool_response=""`로 관찰됐으므로 result path 전체를 제외하고 성공으로 추정하지 않는다.
 
 명시적인 `scan`·`check` 요청은 대상을 실행하지 않는 읽기 전용 검사 작업이다. 검사에서 HIGH finding이 나와도 검사 자체를 차단하지 않고 `ScanReport`로 결과를 보여 준다. 이후 같은 대상을 설치·열기·실행하려는 별도 action이 생기면 그 action을 새로 판정한다. 검사 도구가 대상 코드를 실행하거나 기본 앱으로 여는 동작은 허용하지 않는다.
 
@@ -242,7 +242,7 @@ OSV/MAL 데이터팩, 다중 패키지 생태계, Docker 분석기, 모바일/AP
 
 ## D12. 구현 착수 조건
 
-**결정:** 전체 M1 제품 구현은 아직 시작하지 않는다. 다음 단계로 허용되는 구현 작업은 두 클라이언트의 hook 사실을 고정하는 **M0 호환성 tracer-bullet**이다.
+**결정:** 전체 M1 제품 구현은 아직 시작하지 않는다. 두 클라이언트의 hook 사실을 고정하는 **M0 호환성 tracer-bullet**만 구현·실행했으며, 결과는 `OBSERVATION_COMPLETE_WITH_EXCLUSIONS`다.
 
 M0는 다음만 검증한다.
 
@@ -253,7 +253,7 @@ M0는 다음만 검증한다.
 - Claude·Codex별 plugin/hooks 비활성 상태와 확인 가능한 self-test·status 필드
 - 같은 이벤트의 sibling hook과 훅 자체 오류·timeout·malformed output의 관찰 결과
 
-M0 결과로 native fixture와 coverage matrix를 체크인한 뒤, durable storage·canonical encoding·HMAC·시간/자원 한도를 확정하고 `use-cases.md`의 immutable fixture manifest·expected JSON을 고정해야 M1 계약을 잠근다. 검증 결과가 가정과 다르면 지원 범위를 축소한다.
+M0 결과로 native fixture와 46 case × 2 client coverage matrix를 만들었지만 `verified=0`, coverage `included=0`이다. Claude에서는 marker·result·Stop과 core fallback을 관찰했으나 독립 target process observer와 실제 사용자 승인이 없고, Codex 0.146.0은 effective per-call cwd와 result outcome을 신뢰할 수 없다. 대화형 `systemMessage` 표시도 미검증이다. 따라서 durable storage·canonical encoding·HMAC·시간/자원 한도와 `use-cases.md`의 immutable M1 fixture manifest·expected JSON을 고정하더라도 이 native 경계를 먼저 닫거나 지원 범위를 명시적으로 축소하기 전에는 M1 계약을 잠그지 않는다.
 
 Codex에서 인간 prompt와 자동 continuation을 구분하지 못하므로 제품 소유 로컬 확인 채널의 action-bound transport를 구현·검증하기 전까지 Codex의 HIGH 명령 공개를 포함한 full M1 지원을 선언하지 않는다. M1 GO에는 disclosure helper와 구조화된 scan helper의 신뢰 transport가 필요하다. 범위 밖 `NOT_COVERED` 처리, 중복·병렬 호출의 idempotency, case×client/version×OS 적용 행렬과 adversarial negative fixture를 추가한다.
 

@@ -1,0 +1,25 @@
+#[cfg(feature = "m0-test-profile")]
+pub mod adapter_runtime;
+#[cfg(feature = "m0-test-profile")]
+pub mod contracts;
+#[cfg(feature = "m0-test-profile")]
+pub mod m0;
+#[cfg(feature = "m0-test-profile")]
+pub mod m0_adapter;
+#[cfg(feature = "m0-test-profile")]
+pub mod m0_fixture_manifest;
+#[cfg(feature = "m0-test-profile")]
+pub mod m0_observation_matrix;
+#[cfg(feature = "m0-test-profile")]
+mod m0_physical_file;
+#[cfg(feature = "m0-test-profile")]
+pub mod m0_profile;
+#[cfg(feature = "m0-test-profile")]
+pub mod m0_secure_fs;
+#[cfg(feature = "m0-test-profile")]
+pub mod m0_status;
+#[cfg(feature = "m0-test-profile")]
+pub mod m0_status_harness;
+#[cfg(feature = "m0-test-profile")]
+pub mod native;
+pub mod strict_json;

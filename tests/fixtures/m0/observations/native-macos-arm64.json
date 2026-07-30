@@ -1,0 +1,230 @@
+{
+  "schema_version": "m0-native-observation-result/v1",
+  "assessed_at": "2026-07-29",
+  "provenance": {
+    "recorded_at": "2026-07-29T15:54:50Z",
+    "harness_summary_relative_path": "tests/fixtures/m0/observations/harness-summary.json",
+    "harness_summary_content_sha256": "sha256:cb009aadb251a85b62051c61125affd14a5ecfb0fee80dc490c254dadfa5534b",
+    "case_results_sha256": "sha256:6f941fa4d96dd2e9c05c0c46bdbaf5da74f2006f09ebd33323c50200097a21d2"
+  },
+  "host": {
+    "os": "macos",
+    "os_version": "26.5.2",
+    "os_build": "25F84",
+    "architecture": "arm64",
+    "process_observer": "unavailable_operation_not_permitted",
+    "target_process_started": null,
+    "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+  },
+  "claude": {
+    "client_version": "2.1.220",
+    "live_markers": {
+      "high_marker_exists": false,
+      "low_marker_exists": true,
+      "info_marker_exists": true,
+      "target_process_started": null,
+      "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+    },
+    "adapter_faults": [
+      {
+        "case_id": "T05-D",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-E",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-F",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-G",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-I",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-J",
+        "target_marker_exists": false,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-K",
+        "target_marker_exists": false,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      }
+    ]
+  },
+  "codex": {
+    "client_version": "0.146.0",
+    "live": {
+      "effective_per_call_workdir_available": false,
+      "success_tool_response": "",
+      "failure_tool_response": "",
+      "result_outcome": "ambiguous_rejected",
+      "high_marker_exists": true,
+      "system_message_in_exec_json": false,
+      "interactive_ui": "unverified",
+      "target_process_started": null,
+      "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+    },
+    "adapter_faults": [
+      {
+        "case_id": "T05-D",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-E",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-F",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-G",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-H-Codex",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-I",
+        "target_marker_exists": true,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-J",
+        "target_marker_exists": false,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      },
+      {
+        "case_id": "T05-K",
+        "target_marker_exists": false,
+        "target_process_started": null,
+        "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+      }
+    ],
+    "prompt_continuation": {
+      "claude_user_prompt_submit_field": "prompt",
+      "claude_prompt_preserved_trailing_lf": true,
+      "user_prompt_submit_count": 1,
+      "stop_count": 2,
+      "stop_hook_active": [
+        false,
+        true
+      ],
+      "continuation_transport": "api_hook_prompt",
+      "second_user_prompt_submit_observed": false,
+      "provenance": "unverified"
+    }
+  },
+  "claims": {
+    "claude_adapter_faults": {
+      "classification": "unverified",
+      "client": "claude",
+      "case_ids": [
+        "T05-D",
+        "T05-E",
+        "T05-F",
+        "T05-G",
+        "T05-I",
+        "T05-J",
+        "T05-K"
+      ],
+      "fact_selector": "/claude/adapter_faults"
+    },
+    "codex_adapter_faults": {
+      "classification": "unverified",
+      "client": "codex",
+      "case_ids": [
+        "T05-D",
+        "T05-E",
+        "T05-F",
+        "T05-G",
+        "T05-H-Codex",
+        "T05-I",
+        "T05-J",
+        "T05-K"
+      ],
+      "fact_selector": "/codex/adapter_faults"
+    },
+    "codex_effective_cwd_unavailable": {
+      "classification": "observed_unsupported",
+      "client": "codex",
+      "case_ids": [
+        "T02",
+        "T03",
+        "T04",
+        "T05-A",
+        "T05-B",
+        "T05-C",
+        "T07",
+        "T09",
+        "T18",
+        "T19-A-HIGH",
+        "T19-A-LOW",
+        "T19-A-INFO",
+        "T19-B-HELPER",
+        "T19-B-ARGV"
+      ],
+      "fact_selector": "/codex/live/effective_per_call_workdir_available"
+    },
+    "codex_prompt_continuation": {
+      "classification": "unverified",
+      "client": "codex",
+      "case_ids": [
+        "T11"
+      ],
+      "fact_selector": "/codex/prompt_continuation"
+    },
+    "codex_result_ambiguous": {
+      "classification": "observed_unsupported",
+      "client": "codex",
+      "case_ids": [
+        "T10-LOW",
+        "T10-INFO"
+      ],
+      "fact_selector": "/codex/live/result_outcome"
+    },
+    "codex_system_message_display": {
+      "classification": "unverified",
+      "client": "codex",
+      "case_ids": [
+        "T20-A",
+        "T20-B",
+        "T20-C",
+        "T20-D"
+      ],
+      "fact_selector": "/codex/live/interactive_ui"
+    }
+  }
+}

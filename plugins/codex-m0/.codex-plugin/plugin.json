@@ -1,0 +1,9 @@
+{
+  "name": "secure-onboard-m0-codex",
+  "version": "0.1.0",
+  "description": "Test-only Secure Onboard Codex hook compatibility probe",
+  "author": {
+    "name": "Secure Onboard"
+  },
+  "hooks": "./hooks/hooks.json"
+}

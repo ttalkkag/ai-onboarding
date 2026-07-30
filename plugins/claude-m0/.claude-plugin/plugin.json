@@ -1,0 +1,8 @@
+{
+  "name": "secure-onboard-m0-claude",
+  "version": "0.1.0",
+  "description": "Test-only Secure Onboard Claude Code hook compatibility probe",
+  "author": {
+    "name": "Secure Onboard"
+  }
+}

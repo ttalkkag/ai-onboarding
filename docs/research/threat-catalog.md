@@ -31,8 +31,21 @@
 | 15 | 고정 EICAR 단일 파일 시그니처 | HIGH | commit/path/68 bytes/content SHA-256가 모두 일치하는 정적 fixture oracle 전용; 실제 악성코드 주장은 금지 |
 | 16 | 대상 텍스트가 사용자 승인·정책 채널로 승격됨 | HIGH | 단순 prompt 문자열이 아니라 실제 command origin/재확인 상태 변경이 관찰됨 |
 | 17 | scanner·parser·로그 오류 또는 timeout | HIGH | 보호 action은 deny, read-only scan은 HIGH finding report; adapter 자체가 실행되지 못한 경로는 비보장 |
+| 18 | npm 12+ 대상이 install script 기본 차단을 선제 해제 (`package.json`의 `allowScripts`, `.npmrc`의 `allow-scripts`, `dangerously-allow-all-scripts`) | LOW | 해제된 script가 현재 install에서 외부 실행·유출 sink까지 도달 |
+| 19 | AI 에이전트 설정·MCP 자격증명 파일을 읽어 외부로 보냄 (`.claude.json`, `.cursor/mcp.json`, `.config/zed/settings.json`, VS Code `.mcp.json` 등) | LOW | 9번과 동일 기준 — credential source에서 network sink까지 실행 가능한 경로 확인 |
 
 설치 훅 자체는 정상 패키지에도 흔하므로 존재만으로 HIGH가 아니다. 반대로 확정 악성 레코드와 정확히 일치하거나 현재 작업이 위험 sink까지 도달하면 HIGH다.
+
+### install script 신호의 양방향 한계
+
+2번과 18번은 **한쪽 방향으로만** 쓴다. lifecycle script의 **존재**는 LOW 신호지만 **부재는 안전 근거가 아니다.**
+
+- 악성 코드가 lifecycle script 대신 **module body**에 있으면 script 검사로는 걸리지 않는다. `--ignore-scripts`로도 막히지 않는다.
+- `binding.gyp`가 있고 자체 `install`·`preinstall`이 없으면 npm이 `node-gyp rebuild`를 암묵적 install 명령으로 만든다. `scripts`가 비어 있어도 코드가 실행된다.
+
+18번은 특히 **완화가 아니라 탐지 지점**이다. npm 12의 기본 차단을 해제하는 스위치는 대상 저장소의 `package.json`·`.npmrc`에 있고, 이 제품의 대상은 방금 받은 신뢰 불가 저장소이므로 그 파일은 공격자 통제 하다. name-only 승인 엔트리는 특정 버전이 아니라 이후 모든 버전을 허용하며, `npx`·`npm exec`에는 이 게이트 자체가 없다. 따라서 "npm이 기본 차단하므로 안전"으로 축약하지 않고 effective 설정을 판정 입력으로 읽는다. 이는 아래 "프로젝트 설정·ignore·환경 주입을 신뢰하지 않는다" 규칙과 11번의 구체화다.
+
+근거와 1차 출처는 `external-harness-harvest.md` §C3·§C4에 있다.
 
 ## AI 상관분석 후보
 
@@ -60,6 +73,7 @@ AI는 외부 프로젝트 원문을 Claude Code·Codex의 정상 데이터 흐�
 ## 검사기가 지켜야 할 규칙
 
 - 실제 판정은 PreToolUse tool input을 기준으로 한다.
+- allow/deny 판정은 명령 문자열의 prefix·root command가 아니라 argv 구조를 파싱해 정한다. pipe, `;`, `&&`, command substitution, heredoc과 `bash -c` 내부를 각각 본다. prefix 매칭은 보안 통제가 아니다(`external-harness-harvest.md` §C10).
 - 검사 과정에서 대상 install·build·open·execute를 대신 수행하지 않는다.
 - 프로젝트 설정·ignore·환경 주입을 신뢰하지 않는다.
 - 명령 원문·비밀값·소스 원문·절대 경로를 로그·캐시에 저장하지 않는다.

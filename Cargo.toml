@@ -1,0 +1,39 @@
+[package]
+name = "secure-onboard"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+
+[features]
+default = []
+m0-test-profile = ["dep:libc"]
+
+[dependencies]
+hex = "0.4.3"
+libc = { version = "0.2.172", optional = true }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+sha2 = "0.10.9"
+thiserror = "2.0.12"
+
+[dev-dependencies]
+tempfile = "3.20.0"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+
+[[bin]]
+name = "secure-onboard-m0-core"
+path = "src/bin/secure-onboard-m0-core.rs"
+required-features = ["m0-test-profile"]
+
+[[bin]]
+name = "secure-onboard-m0-hook"
+path = "src/bin/secure-onboard-m0-hook.rs"
+required-features = ["m0-test-profile"]
+
+[[bin]]
+name = "secure-onboard"
+path = "src/bin/secure-onboard.rs"

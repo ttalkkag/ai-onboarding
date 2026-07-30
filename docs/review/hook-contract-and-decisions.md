@@ -5,7 +5,7 @@
 - 방법: 공식 문서 직접 대조(Claude Code hooks/plugins/settings, Codex hooks/plugins) + 저장소 기계 점검 + 사용자 확인
 - 성격: 이 문서는 **검증 기록과 사용자 결정의 원본**이다. 제품 계약 정본은 `../plan/`이다.
 
-> 주의: 이 검토를 수행하는 동안 다른 에이전트 세션이 같은 `docs/plan/*.md`를 동시에 개정했다. 아래 "정본 반영 상태"는 2026-07-26 17:30 KST 시점 기준이며, 그 이후 개정에서는 다시 대조해야 한다.
+> 주의: 이 검토를 수행하는 동안 다른 에이전트 세션이 같은 `docs/plan/*.md`를 동시에 개정했다. 아래 "정본 반영 상태"는 2026-07-26 17:30 KST 시점 기준이다. 2026-07-29 M0 실행 결과와 현재 판정은 [리뷰 인덱스](README.md)가 우선하며, 이 문서의 후속 정정도 그 결과를 반영한다.
 
 ## A. 사용자가 확정한 결정 (4건)
 
@@ -89,6 +89,8 @@
 3. 표시되는 최대 길이·개행·서식 제약 — 짧은 ref와 재확인 문구가 잘리지 않는가
 4. Codex에서 `systemMessage`가 "UI 또는 event stream 중 어디로" 가는지, 대화형 터미널 세션에서 사용자 눈에 보이는가
 
+**2026-07-29 후속 결과:** `codex exec --json`에서는 `systemMessage`가 관찰되지 않았다. 실제 대화형 terminal UI를 실행하지 않았으므로 위 네 항목은 검증되지 않았고, LOW 사용자 열람이나 HIGH 재확인 안내 채널을 제품 계약으로 확정하지 않는다.
+
 ## B. 공식 문서로 확인한 사실
 
 아래는 이번 검토에서 공식 문서를 직접 조회해 확인한 값이다. 모든 인용 URL은 조회 시점에 HTTP 200이다.
@@ -128,7 +130,7 @@
 
 **함의 1:** fail-closed는 **어댑터가 살아서 유효한 deny를 반환하는 경우에만** 성립한다. 어댑터가 죽거나 멈추거나 exit 1로 끝나면 두 CLI 모두 실행을 계속한다. 정본은 이미 이를 반영했다(`workflow.md` §7 말미, `use-cases.md` T05-F/J/K, 리뷰 blocker #2).
 
-**함의 2 (미반영):** 훅 선언의 `timeout` 값을 명시하지 않으면 기본값이 600초다. 어댑터가 멈추면 사용자 세션이 최대 10분 정지한다. `hooks.json`에 제품이 감당할 수 있는 작은 명시적 timeout을 넣는 것은 구현 세부가 아니라 **UX와 fail-open 노출 시간을 동시에 결정하는 값**이므로 M0에서 고정해야 한다.
+**함의 2 (반영됨):** 훅 선언의 `timeout` 값을 명시하지 않으면 기본값이 600초다. 현재 M0 `hooks.json`은 hook timeout 5초와 core child timeout 3초를 명시한다. 1초 core timeout은 새로 복사한 macOS artifact의 첫 실행에서 정상 core를 timeout으로 오판해 폐기했다.
 
 ### B4. 배포·신뢰 경계
 
@@ -152,9 +154,9 @@
 - Claude Code `Stop` 훅의 `last_assistant_message` 존재. 문서는 "Hooks that need the final assistant text of the current turn should use `last_assistant_message` on Stop and SubagentStop instead of reading the transcript"라며 transcript 읽기보다 이 필드를 권장한다
 - **Codex `Stop`에도 `last_assistant_message` 존재** — 응답 원문 확인이 한쪽 클라이언트 전용이 아니다
 - Claude Code에 성공 `PostToolUse`와 실패 `PostToolUseFailure`가 **별도 이벤트로 존재**
-- Codex는 단일 `PostToolUse`가 "also runs after commands that exit with a non-zero status" — 실패까지 포함. 따라서 어댑터의 공통 outcome 정규화 설계가 맞다
+- Codex는 단일 `PostToolUse`가 "also runs after commands that exit with a non-zero status" — 실패까지 포함한다. 그러나 CLI 0.146.0 실측에서는 success와 exit 23 failure의 `tool_response`가 모두 빈 문자열이므로 outcome을 정규화할 수 없고 adapter가 거부한다
 - Codex `PreToolUse`에 `tool_use_id`와 `turn_id` 존재
-- 두 CLI 모두 `UserPromptSubmit` 존재 (Claude는 `user_prompt`, Codex는 `prompt` 필드)
+- 두 CLI 모두 `UserPromptSubmit`이 존재한다. 2026-07-29 exact payload에서 두 클라이언트 모두 prompt 본문 필드는 `prompt`였고, Claude 값은 마지막 LF를 보존했다
 - `PermissionRequest`가 두 CLI에 존재하며, 승인 요청이 발생하지 않는 호출은 놓칠 수 있으므로 1차 게이트로 부적합하다는 판단이 타당
 - `disableAllHooks` 실재
 
@@ -203,29 +205,29 @@
 
 ## G. 관찰: 계약 규모
 
-`report-template.md`는 이번 개정으로 1,279줄이 됐고, 스키마는 15종을 넘는다. 아직 제품 코드는 한 줄도 없으며 M1 alpha의 지원 흐름은 3개다. 저장소 `AGENTS.md`는 "최소 코드", "단일 사용처에 추상화 금지", "200줄로 쓴 것이 50줄이면 다시 써라"를 원칙으로 명시한다.
+2026-07-26 당시 `report-template.md`는 1,279줄이었고 스키마는 15종을 넘었으며 제품 코드는 아직 없었다. 현재는 test-only M0 tracer가 구현됐지만 M1 alpha의 지원 흐름은 여전히 문서 계약일 뿐이다. 저장소 `AGENTS.md`는 "최소 코드", "단일 사용처에 추상화 금지", "200줄로 쓴 것이 50줄이면 다시 써라"를 원칙으로 명시한다.
 
 이는 오류가 아니라 트레이드오프다. 계약을 먼저 고정하면 M0/M1의 expected JSON을 기계적으로 검증할 수 있고, 실제로 이번 개정에서 durable transaction·tombstone·replay 같은 어려운 실패 모드가 문서 단계에서 드러났다. 다만 다음 두 가지는 실측 전 계약 확장의 위험 신호로 남긴다.
 
-- M0가 아직 native payload를 하나도 확보하지 못한 상태에서 스키마 세부가 계속 늘고 있다. M0 결과가 가정과 다르면 되돌릴 문서량이 그만큼 커진다.
+- M0 결과가 실제로 일부 가정과 달랐다. Codex 0.146.0의 effective cwd와 result outcome, 자동 continuation provenance, interactive 표시를 지원으로 추정하지 않고 coverage에서 제외한 상태를 유지해야 한다.
 - `use-cases.md` M1 착수 조건이 요구하는 fixture·expected JSON 총량(C·N·F·R·O·A·K·L·S 계열 전체 × client/version/OS)은 3개 흐름 alpha치고 매우 크다. M0 종료 시점에 이 목록을 **줄이는 방향으로** 한 번 재검토할 것을 권한다.
 
 ## H. 구현 착수 판정
 
-- **M0 hook tracer-bullet: GO.** 이번 검증은 M0가 전제한 훅 사실(Stop `last_assistant_message`, `PostToolUseFailure`, Codex 단일 `PostToolUse`, `tool_use_id`, deny 출력 형식, 훅 신뢰 절차)이 모두 공식 문서와 일치함을 확인했다. M0를 막는 사실 오류는 발견되지 않았다.
-- **전체 M1 제품 구현: NO-GO.** P01/P02/P03과 D13 네 항목이 모두 닫혔지만, `use-cases.md` §12 착수 조건 1·3·5·6은 정의상 **M0 실행 결과가 있어야 닫힌다**. 즉 지금 문서를 더 고쳐서 M1 GO로 만들 수 있는 상태가 아니며, 다음 관문은 문서 작업이 아니라 M0 실행이다.
+- **M0 hook tracer-bullet: `OBSERVATION_COMPLETE_WITH_EXCLUSIONS`.** 구현과 관찰 행렬은 완료했지만 `verified=0`, coverage `included=0`이다. marker와 payload 관찰을 target process start·interactive approval·사용자 표시 증명으로 승격하지 않는다.
+- **전체 M1 제품 구현: NO-GO.** Codex 0.146.0의 shell action/result path는 제외됐고 Claude도 독립 process observer와 실제 승인 증거가 없다. durable M1 계약과 exact fixtures도 닫히지 않았다.
 - **M2: NO-GO.**
 
 ### 문서 검토 관점의 완료 판정
 
-이 검토 기준으로 **문서에 남은 사실 오류·내부 모순·미정의 스키마는 없다.** C1–C5를 모두 반영했고, secret·제어문자 정책이 9개 문서에서 일치하며, 인용 URL·상대 링크·코드펜스·BOM 점검이 모두 통과한다.
+2026-07-26 문서 검토에서 C1–C5와 secret·제어문자 정책을 정리했다. 이후 M0 실측로 드러난 native 차이는 위 후속 정정과 현재 리뷰 인덱스에 반영했다.
 
 남은 것은 문서 결함이 아니라 성격이 다른 두 가지다.
 
-1. **M0 실행으로만 얻을 수 있는 값** — native payload bytes, `systemMessage` 실제 렌더링(T20), 훅 선언 timeout, Codex/Claude 버전별 fault 동작. 문서에는 "무엇을 측정할지"까지 고정돼 있고 "측정값"만 비어 있다.
+1. **추가 환경·사람이 필요한 값** — 독립 target process observation, interactive operator approval, `systemMessage` 실제 terminal 렌더링(T20). noninteractive probe 결과로 이를 성공이라고 추정하지 않는다.
 2. **사용자 결정 1건** — 저장소 자체 라이선스(F절).
 
-따라서 다음 단계는 **M0 tracer-bullet 구현 착수**이며, 문서 측 선행 작업은 없다.
+따라서 다음 단계는 제외된 M0 경계를 실제 증거로 닫거나 지원 범위를 더 축소하는 일이다. M1 구현은 별도 GO 판정 전까지 시작하지 않는다.
 
 ## I. 구현 프롬프트 검증 (2026-07-26)
 

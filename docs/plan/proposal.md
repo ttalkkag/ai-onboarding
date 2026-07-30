@@ -1,9 +1,9 @@
 # Secure Onboard 기획서
 
-- 문서 상태: **M0 hook tracer-bullet GO / 전체 M1 NO-GO**
-- 기준일: 2026-07-26
+- 문서 상태: **M0 `OBSERVATION_COMPLETE_WITH_EXCLUSIONS`(검증된 보호 coverage 0) / 전체 M1 NO-GO**
+- 기준일: 2026-07-29
 - 제품: Claude Code·Codex 로컬 CLI용 선택형 실행 가드레일
-- 구현 상태: 미착수. 첫 단계는 두 클라이언트의 `PreToolUse` tracer-bullet이다.
+- 구현 상태: test-only M0 tracer·fixture·harness·관찰 행렬까지 구현. M1 제품 기능은 미착수다.
 - 정책 정본: `decisions.md`
 - 상태 전이 정본: `workflow.md`
 - 출력·필드 정본: `report-template.md`
@@ -47,7 +47,7 @@ Secure Onboard는 AI가 실제 로컬 작업을 수행하기 직전에 위험을
 
 | 단계 | 범위 | 완료 증거 |
 |------|------|-----------|
-| M0 hook tracer-bullet | Claude·Codex의 shell/exec `PreToolUse`, 고정 sentinel의 HIGH deny·LOW/INFO continue, result·Stop hook, 상태 진단 | 실제 native payload fixture, 차단 대상 tool handler·process 0, native approval 유지 |
+| M0 hook tracer-bullet | Claude·Codex의 shell/exec `PreToolUse`, 고정 sentinel의 HIGH deny·LOW/INFO continue, result·Stop hook, 상태 진단 | exact fixture와 관찰 행렬. 현재 독립 process observer·interactive approval·terminal 표시 증거가 없어 protection coverage는 모두 제외 |
 | M1 fixture-backed alpha | npm 설치, 로컬 파일 열기, 명시적 읽기 전용 검사, 결정론적 규칙, 명령 출처·재확인·표시, scope·로그·캐시 | 확정 fixture manifest와 expected JSON 통과 |
 | M2 심층 분석 | install hook→sink, secret source→외부 sink, container·실행 경로 분석, 검증된 AI 승격, 추가 MCP/file-edit coverage | 별도 스키마와 회귀 oracle 통과 |
 
@@ -184,7 +184,7 @@ LOW·INFO를 허용할 때 Claude Code·Codex 자체 sandbox·권한 요청을 �
 - `HIGH|LOW|INFO` 판정
 - redacted local event 기록
 
-HIGH 원명령은 활동 로그나 캐시에 넣지 않는다. 명령 제공을 위해 exact invocation identity HMAC과 원문 invocation/display를 사용자 전용 `PendingBlock`에 최대 10분 보관한다. secret 출처에 따른 치환이나 terminal control escape는 하지 않는다. 모델은 action/ref 인자 없는 helper만 호출하고, 어댑터가 신뢰된 session·재확인 context를 주입하면 코어가 내부 ID와 single-use pending을 resolve한다. Stop 훅이 action-bound nonce·marker·digest를 마지막 assistant 응답 원문에서 확인한 뒤에만 `high_command_response_verified`로 기록한다. UI 전달·렌더 완료·사용자 열람은 증명하지 않는다.
+HIGH 원명령은 활동 로그나 캐시에 넣지 않는다. 명령 제공을 위해 exact invocation identity HMAC과 원문 invocation/display를 사용자 전용 `PendingBlock`에 최대 10분 보관한다. secret은 출처와 무관하게 치환하지 않되, ANSI/OSC·양방향 제어문자·NUL·코드펜스 탈출은 항상 가시적인 dialect별 안전 표현으로 바꾸고 `표시 안전 변환`으로 라벨링한다. 모델은 action/ref 인자 없는 helper만 호출하고, 어댑터가 신뢰된 session·재확인 context를 주입하면 코어가 내부 ID와 single-use pending을 resolve한다. Stop 훅이 action-bound nonce·marker·digest를 마지막 assistant 응답 원문에서 확인한 뒤에만 `high_command_response_verified`로 기록한다. UI 전달·렌더 완료·사용자 열람은 증명하지 않는다.
 
 정규화된 필드와 enum은 `report-template.md`를 따른다.
 
@@ -247,7 +247,7 @@ M1 검사 코어는 별도 registry lookup이나 artifact download를 하지 않
 
 ## 12. 마일스톤
 
-1. **M0 — hook tracer-bullet:** 두 CLI의 native payload·deny/continue·result/Stop·status와 고정 sentinel 규칙
+1. **M0 — hook tracer-bullet:** 구현·관찰 완료-with-exclusions. 두 CLI의 native payload·deny/continue·result/Stop·status와 고정 sentinel 규칙을 기록했지만 검증된 보호 coverage는 0
 2. **M1 — fixture-backed end-to-end alpha:** npm 설치·파일 열기·읽기 전용 검사, 결정론적 규칙, 명령 출처·재확인·공개, scope·로그·캐시
 3. **M2 — 심층 분석:** 설치 훅 도달성, 스크립트·난독화·비밀 유출 경로, 검증된 AI 승격, 추가 tool coverage
 4. **M3 — 배포:** Windows·macOS 패키징, 설치·업데이트·상태·삭제, 지원 버전 matrix
@@ -257,9 +257,11 @@ M1 검사 코어는 별도 registry lookup이나 artifact download를 하지 않
 
 판정은 다음과 같다.
 
-- **M0 hook tracer-bullet: GO**
+- **M0 hook tracer-bullet: `OBSERVATION_COMPLETE_WITH_EXCLUSIONS`**
 - **전체 M1 제품 구현: NO-GO**
 - **M2 심층 분석: NO-GO**
+
+M0의 현재 행렬은 46 case × 2 client를 모두 분류하지만 `verified=0`, coverage `included=0`이다. Claude 2.1.220에서는 HIGH marker 부재와 LOW·INFO marker, result/Stop 및 core fallback을 관찰했으나 target process observer와 실제 사용자 승인이 없었다. Codex 0.146.0은 effective per-call cwd와 success/failure result outcome을 신뢰할 수 없어 shell action/result path를 제외했다. `systemMessage`의 대화형 terminal 표시도 미검증이다.
 
 M1은 다음 조건을 모두 충족한 뒤 시작한다.
 
@@ -272,4 +274,4 @@ M1은 다음 조건을 모두 충족한 뒤 시작한다.
 7. `NOT_COVERED`와 지원 grammar parse failure의 구분, case×client/version×OS 적용 행렬 고정
 8. Codex 모델 transcript는 재확인 source로 사용하지 않고 제품 소유 로컬 확인 채널의 action-bound fixture를 고정
 
-M0는 실제 npm/EICAR 분석기나 캐시·재확인 UI를 만들지 않고 고정 sentinel로 hook 경계만 증명한다. 이 증거 전에는 “M1 구현 완료”, “배포 준비 완료”, “모든 실행 보호”, “강제 보안 통제”라고 표시하지 않는다.
+M0는 실제 npm/EICAR 분석기나 캐시·재확인 UI를 만들지 않고 고정 sentinel로 hook 경계를 관찰한다. 제외된 증거를 닫고 M1 계약을 별도 GO로 갱신하기 전에는 “M1 구현 완료”, “배포 준비 완료”, “모든 실행 보호”, “강제 보안 통제”라고 표시하지 않는다.

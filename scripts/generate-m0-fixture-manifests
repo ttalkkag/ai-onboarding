@@ -1,0 +1,739 @@
+#!/usr/bin/env python3
+
+import argparse
+import hashlib
+import json
+import os
+import platform
+import stat
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+
+TARGETS = (
+    {
+        "client": "claude",
+        "client_version": "2.1.220",
+        "version_output": "2.1.220 (Claude Code)",
+        "prefix": "claude-2.1.220-macos-arm64",
+    },
+    {
+        "client": "codex",
+        "client_version": "0.146.0",
+        "version_output": "codex-cli 0.146.0",
+        "prefix": "codex-0.146.0-macos-arm64",
+    },
+)
+
+HELPERS = (
+    ("default", "helpers/m0-target.mjs"),
+    ("failure", "helpers/m0-target-fail.mjs"),
+    ("near_match", "helpers/m0-target-near-match.mjs"),
+)
+
+NATIVE_FIXTURES = (
+    ("prompt", "prompt"),
+    ("pre_tool_use", "pre"),
+    ("result_success", "post-success"),
+    ("result_failure", "post-failure"),
+    ("stop", "stop"),
+)
+
+HASH_CHUNK_BYTES = 64 * 1024
+MAX_EXECUTABLE_BYTES = 512 * 1024 * 1024
+MAX_PRODUCT_ARTIFACT_BYTES = 64 * 1024 * 1024
+MAX_DEFINITION_BYTES = 1024 * 1024
+MAX_PROFILE_BYTES = 64 * 1024
+MAX_FIXTURE_BYTES = 1024 * 1024
+MAX_RUNTIME_BYTES = 64 * 1024 * 1024
+
+
+class GenerationError(Exception):
+    pass
+
+
+def parse_arguments():
+    repository_root = Path(__file__).resolve().parent.parent
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate exact-host Secure Onboard M0 fixture manifests. "
+            "The release artifact and every observed native fixture must already exist."
+        )
+    )
+    parser.add_argument(
+        "--fixture-root",
+        type=Path,
+        default=repository_root / "tests/fixtures/m0",
+    )
+    parser.add_argument(
+        "--artifact",
+        type=Path,
+        default=repository_root / "target/release/secure-onboard-m0-hook",
+    )
+    parser.add_argument(
+        "--core-artifact",
+        type=Path,
+        default=repository_root / "target/release/secure-onboard-m0-core",
+    )
+    parser.add_argument(
+        "--claude-invoked",
+        type=Path,
+        default=Path.home() / ".local/bin/claude",
+    )
+    parser.add_argument(
+        "--codex-invoked",
+        type=Path,
+        default=Path("/opt/homebrew/bin/codex"),
+    )
+    parser.add_argument(
+        "--codex-runtime",
+        type=Path,
+        default=Path(
+            "/opt/homebrew/lib/node_modules/@openai/codex/node_modules/"
+            "@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+        ),
+    )
+    return parser.parse_args()
+
+
+def fail(message):
+    raise GenerationError(message)
+
+
+def sha256_label(content):
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
+def strict_json(content, label):
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError as error:
+        fail(f"{label} is not UTF-8 JSON: {error}")
+
+    def reject_duplicates(pairs):
+        value = {}
+        for key, item in pairs:
+            if key in value:
+                fail(f"{label} has duplicate object key: {key}")
+            value[key] = item
+        return value
+
+    def reject_constant(value):
+        fail(f"{label} has non-finite JSON number: {value}")
+
+    try:
+        return json.loads(
+            text,
+            object_pairs_hook=reject_duplicates,
+            parse_constant=reject_constant,
+        )
+    except json.JSONDecodeError as error:
+        fail(f"{label} is not strict JSON: {error}")
+
+
+def canonical_json(value):
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as error:
+        fail(f"cannot encode canonical JSON: {error}")
+
+
+def require_exact_keys(value, expected, label):
+    if not isinstance(value, dict) or set(value) != set(expected):
+        fail(f"{label} fields must be exactly {sorted(expected)}")
+
+
+def is_sha256_label(value):
+    return (
+        isinstance(value, str)
+        and value.startswith("sha256:")
+        and len(value) == 71
+        and all(character in "0123456789abcdef" for character in value[7:])
+    )
+
+
+def physical_directory(path, label):
+    if not path.is_absolute():
+        fail(f"{label} path must be absolute: {path}")
+    try:
+        resolved = path.resolve(strict=True)
+        metadata = path.lstat()
+    except OSError as error:
+        fail(f"{label} directory is unavailable: {path}: {error}")
+    if path != resolved or not stat.S_ISDIR(metadata.st_mode) or path.is_symlink():
+        fail(f"{label} must be a physical non-symlink directory: {path}")
+    return resolved
+
+
+def stable_file_identity(metadata):
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+        metadata.st_gid,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def read_bound_file(path, label, max_bytes, executable=False, capture_bytes=True):
+    if not path.is_absolute():
+        fail(f"{label} path must be absolute: {path}")
+    descriptor = None
+    try:
+        resolved = path.resolve(strict=True)
+        path_metadata = path.lstat()
+        descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | os.O_NOFOLLOW,
+        )
+        descriptor_metadata = os.fstat(descriptor)
+    except OSError as error:
+        fail(f"{label} is missing or invalid: {path}: {error}")
+    try:
+        initial_identity = stable_file_identity(descriptor_metadata)
+        if (
+            path != resolved
+            or not stat.S_ISREG(path_metadata.st_mode)
+            or not stat.S_ISREG(descriptor_metadata.st_mode)
+            or stable_file_identity(path_metadata) != initial_identity
+        ):
+            fail(f"{label} must be a stable physical non-symlink regular file: {path}")
+        if executable and descriptor_metadata.st_mode & 0o111 == 0:
+            fail(f"{label} is not executable: {path}")
+        if descriptor_metadata.st_size > max_bytes:
+            fail(f"{label} exceeds its {max_bytes}-byte M0 limit")
+
+        digest = hashlib.sha256()
+        content = bytearray() if capture_bytes else None
+        total_bytes = 0
+        while True:
+            chunk = os.read(descriptor, HASH_CHUNK_BYTES)
+            if not chunk:
+                break
+            total_bytes += len(chunk)
+            if total_bytes > max_bytes:
+                fail(f"{label} exceeds its {max_bytes}-byte M0 limit")
+            digest.update(chunk)
+            if content is not None:
+                content.extend(chunk)
+
+        descriptor_after = os.fstat(descriptor)
+        path_after = path.lstat()
+        resolved_after = path.resolve(strict=True)
+        if (
+            resolved_after != resolved
+            or stable_file_identity(descriptor_after) != initial_identity
+            or stable_file_identity(path_after) != initial_identity
+        ):
+            fail(f"{label} changed while its bytes were observed")
+        return {
+            "absolute_path": resolved,
+            "bytes": bytes(content) if content is not None else None,
+            "identity": initial_identity,
+            "sha256": f"sha256:{digest.hexdigest()}",
+        }
+    except OSError as error:
+        fail(f"{label} changed or became unavailable: {path}: {error}")
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def observe_stable_version(
+    path,
+    label,
+    expected_output,
+    max_bytes,
+    invoked_path=None,
+):
+    before = read_bound_file(
+        path,
+        label,
+        max_bytes,
+        executable=True,
+        capture_bytes=False,
+    )
+    try:
+        completed = subprocess.run(
+            [os.fspath(before["absolute_path"]), "--version"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        fail(f"{label} --version could not complete: {error}")
+    if completed.returncode != 0:
+        fail(
+            f"{label} --version exited {completed.returncode}: "
+            f"{completed.stderr.decode('utf-8', errors='replace')}"
+        )
+    try:
+        stdout = completed.stdout.decode("utf-8")
+    except UnicodeDecodeError as error:
+        fail(f"{label} --version output is not UTF-8: {error}")
+    if not stdout.endswith("\n") or "\n" in stdout[:-1] or stdout.endswith("\n\n"):
+        fail(f"{label} --version output is not one LF-terminated line")
+    version_output = stdout[:-1]
+    if version_output != expected_output:
+        fail(
+            f"{label} version mismatch: expected "
+            f"{expected_output!r}, observed {version_output!r}"
+        )
+
+    after = read_bound_file(
+        before["absolute_path"],
+        label,
+        max_bytes,
+        executable=True,
+        capture_bytes=False,
+    )
+    if (
+        before["identity"] != after["identity"]
+        or before["sha256"] != after["sha256"]
+    ):
+        fail(f"{label} executable changed during version observation")
+    if invoked_path is not None:
+        try:
+            invoked_after = invoked_path.resolve(strict=True)
+        except OSError as error:
+            fail(f"{label} invoked executable changed during version observation: {error}")
+        if invoked_after != before["absolute_path"]:
+            fail(f"{label} invoked executable changed during version observation")
+    return before, version_output
+
+
+def client_executable(invoked_path, target):
+    if not invoked_path.is_absolute():
+        fail(f"{target['client']} invoked path must be absolute: {invoked_path}")
+    try:
+        resolved_path = invoked_path.resolve(strict=True)
+    except OSError as error:
+        fail(
+            f"{target['client']} invoked executable is unavailable: "
+            f"{invoked_path}: {error}"
+        )
+    executable, version_output = observe_stable_version(
+        resolved_path,
+        f"{target['client']} resolved executable",
+        target["version_output"],
+        MAX_EXECUTABLE_BYTES,
+        invoked_path=invoked_path,
+    )
+    return {
+        "invoked_path": os.fspath(invoked_path),
+        "resolved_path": os.fspath(executable["absolute_path"]),
+        "sha256": executable["sha256"],
+        "version_output": version_output,
+    }
+
+
+def client_runtime_artifact(target, executable, codex_runtime):
+    if target["client"] == "claude":
+        return {
+            "role": "resolved_executable",
+            "absolute_path": executable["resolved_path"],
+            "sha256": executable["sha256"],
+        }
+
+    runtime, _ = observe_stable_version(
+        codex_runtime,
+        "codex native runtime",
+        target["version_output"],
+        MAX_EXECUTABLE_BYTES,
+    )
+    return {
+        "role": "native_backend",
+        "absolute_path": os.fspath(runtime["absolute_path"]),
+        "sha256": runtime["sha256"],
+    }
+
+
+def shipped_plugin_definition(target):
+    repository_root = Path(__file__).resolve().parent.parent
+    plugin_root = repository_root / "plugins" / f"{target['client']}-m0"
+    manifest_relative = (
+        ".claude-plugin/plugin.json"
+        if target["client"] == "claude"
+        else ".codex-plugin/plugin.json"
+    )
+    manifest = read_bound_file(
+        plugin_root / manifest_relative,
+        f"{target['client']} shipped plugin manifest",
+        MAX_DEFINITION_BYTES,
+    )
+    hooks = read_bound_file(
+        plugin_root / "hooks/hooks.json",
+        f"{target['client']} shipped hooks definition",
+        MAX_DEFINITION_BYTES,
+    )
+    return (
+        {
+            "absolute_path": os.fspath(manifest["absolute_path"]),
+            "sha256": manifest["sha256"],
+        },
+        {
+            "absolute_path": os.fspath(hooks["absolute_path"]),
+            "sha256": hooks["sha256"],
+        },
+    )
+
+
+def read_relative_fixture(
+    fixture_root,
+    relative_path,
+    label,
+    max_bytes=MAX_FIXTURE_BYTES,
+):
+    path = fixture_root / relative_path
+    try:
+        return read_bound_file(path, label, max_bytes)["bytes"]
+    except GenerationError:
+        raise
+    except OSError as error:
+        fail(f"{label} is missing or invalid: {path}: {error}")
+
+
+def validate_profile(profile, profile_bytes, target, helpers):
+    if not profile_bytes.endswith(b"}\n") or profile_bytes.endswith(b"}\n\n"):
+        fail(f"{target['client']} test profile must end in exactly one LF")
+    require_exact_keys(
+        profile,
+        {
+            "schema_version",
+            "build_flavor",
+            "client",
+            "client_version",
+            "os",
+            "architecture",
+            "fixture_runtime",
+            "shell_binding",
+            "helpers",
+            "marker_root_relative",
+        },
+        f"{target['client']} test profile",
+    )
+    expected_metadata = {
+        "schema_version": "m0-test-profile/v1",
+        "build_flavor": "test",
+        "client": target["client"],
+        "client_version": target["client_version"],
+        "os": "macos",
+        "architecture": "arm64",
+    }
+    for key, expected in expected_metadata.items():
+        if profile.get(key) != expected:
+            fail(
+                f"{target['client']} test profile metadata mismatch for {key}: "
+                f"expected {expected!r}"
+            )
+    profile_helpers = profile.get("helpers")
+    if not isinstance(profile_helpers, list) or len(profile_helpers) != 2:
+        fail(f"{target['client']} test profile must bind default and failure helpers")
+    for index, role in enumerate(("default", "failure")):
+        expected = helpers[index]
+        actual = profile_helpers[index]
+        require_exact_keys(
+            actual,
+            {
+                "role",
+                "relative_path",
+                "content_sha256",
+                "command_grammar",
+                "allowed_sentinels",
+            },
+            f"{target['client']} test profile {role} helper",
+        )
+        expected_sentinels = (
+            ["high", "low", "info"] if role == "default" else ["low", "info"]
+        )
+        if (
+            actual.get("role") != role
+            or actual.get("relative_path") != expected["relative_path"]
+            or actual.get("content_sha256") != expected["content_sha256"]
+            or actual.get("command_grammar") != "posix_ascii_argv4/v1"
+            or actual.get("allowed_sentinels") != expected_sentinels
+        ):
+            fail(
+                f"{target['client']} test profile {role} helper digest "
+                "does not match current fixture bytes"
+            )
+    require_exact_keys(
+        profile.get("fixture_runtime"),
+        {"executable_path", "executable_sha256", "version_output"},
+        f"{target['client']} fixture runtime",
+    )
+    require_exact_keys(
+        profile.get("shell_binding"),
+        {
+            "executable_path",
+            "executable_sha256",
+            "flags",
+            "dialect",
+            "resolution_fingerprint",
+        },
+        f"{target['client']} shell binding",
+    )
+    runtime = profile["fixture_runtime"]
+    shell = profile["shell_binding"]
+    if (
+        not isinstance(runtime["executable_path"], str)
+        or not Path(runtime["executable_path"]).is_absolute()
+        or not is_sha256_label(runtime["executable_sha256"])
+        or not isinstance(runtime["version_output"], str)
+        or not runtime["version_output"]
+        or not isinstance(shell["executable_path"], str)
+        or not Path(shell["executable_path"]).is_absolute()
+        or not is_sha256_label(shell["executable_sha256"])
+        or shell["flags"] != ["-lc"]
+        or shell["dialect"] != "posix_sh"
+        or not is_sha256_label(shell["resolution_fingerprint"])
+        or profile.get("marker_root_relative") != "markers"
+    ):
+        fail(f"{target['client']} test profile runtime or shell binding is invalid")
+
+    runtime_file, _ = observe_stable_version(
+        Path(runtime["executable_path"]),
+        f"{target['client']} fixture runtime",
+        runtime["version_output"],
+        MAX_RUNTIME_BYTES,
+    )
+    if runtime_file["sha256"] != runtime["executable_sha256"]:
+        fail(
+            f"{target['client']} fixture runtime SHA-256 does not match physical bytes"
+        )
+
+    shell_file = read_bound_file(
+        Path(shell["executable_path"]),
+        f"{target['client']} shell executable",
+        MAX_RUNTIME_BYTES,
+        executable=True,
+        capture_bytes=False,
+    )
+    if shell_file["sha256"] != shell["executable_sha256"]:
+        fail(
+            f"{target['client']} shell executable SHA-256 does not match physical bytes"
+        )
+
+
+def build_manifest(
+    fixture_root,
+    artifact_path,
+    artifact_bytes,
+    core_artifact_path,
+    core_artifact_bytes,
+    target,
+    invoked_path,
+    codex_runtime,
+    helpers,
+):
+    prefix = target["prefix"]
+    profile_relative = f"profiles/{prefix}.json"
+    profile_bytes = read_relative_fixture(
+        fixture_root,
+        profile_relative,
+        f"{target['client']} test profile",
+        MAX_PROFILE_BYTES,
+    )
+    profile = strict_json(profile_bytes[:-1], f"{target['client']} test profile")
+    validate_profile(profile, profile_bytes, target, helpers)
+    if artifact_bytes.count(profile_bytes) != 1:
+        fail(
+            f"{target['client']} release artifact does not contain the exact "
+            "profile bytes once; rebuild the M0 release artifact"
+        )
+
+    native_fixtures = []
+    for role, suffix in NATIVE_FIXTURES:
+        relative_path = f"native/{prefix}-{suffix}.json"
+        try:
+            content = read_relative_fixture(
+                fixture_root,
+                relative_path,
+                f"{target['client']} required native fixture",
+            )
+        except GenerationError as error:
+            fail(
+                f"{target['client']} required native fixture is missing or invalid: "
+                f"{relative_path}: {error}"
+            )
+        value = strict_json(content, f"{target['client']} native {role} fixture")
+        native_fixtures.append(
+            {
+                "role": role,
+                "relative_path": relative_path,
+                "content_sha256": sha256_label(content),
+                "canonical_json_sha256": sha256_label(canonical_json(value)),
+            }
+        )
+
+    profile_digest = sha256_label(profile_bytes)
+    executable = client_executable(invoked_path, target)
+    plugin_manifest, shipped_hooks_definition = shipped_plugin_definition(target)
+    return {
+        "schema_version": "m0-fixture-manifest/v1",
+        "client": target["client"],
+        "client_version": target["client_version"],
+        "os": "macos",
+        "architecture": "arm64",
+        "client_executable": executable,
+        "client_runtime_artifact": client_runtime_artifact(
+            target,
+            executable,
+            codex_runtime,
+        ),
+        "plugin_manifest": plugin_manifest,
+        "shipped_hooks_definition": shipped_hooks_definition,
+        "product_artifact": {
+            "absolute_path": os.fspath(artifact_path),
+            "sha256": sha256_label(artifact_bytes),
+            "compiled_test_profile_sha256": profile_digest,
+        },
+        "core_artifact": {
+            "absolute_path": os.fspath(core_artifact_path),
+            "sha256": sha256_label(core_artifact_bytes),
+        },
+        "test_profile": {
+            "relative_path": profile_relative,
+            "content_sha256": profile_digest,
+        },
+        "helper_fixtures": helpers,
+        "native_fixtures": native_fixtures,
+    }
+
+
+def write_outputs(output_root, documents):
+    if output_root.exists():
+        physical_directory(output_root, "manifest output")
+    else:
+        output_root.mkdir(mode=0o755)
+    staged = []
+    try:
+        for prefix, document in documents:
+            destination = output_root / f"{prefix}.json"
+            if destination.exists() and (
+                destination.is_symlink() or not destination.is_file()
+            ):
+                fail(f"manifest output is not a physical regular file: {destination}")
+            content = canonical_json(document) + b"\n"
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                dir=output_root,
+                prefix=f".{prefix}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary:
+                temporary.write(content)
+                temporary.flush()
+                os.fsync(temporary.fileno())
+                staged.append((Path(temporary.name), destination))
+        for temporary, destination in staged:
+            os.replace(temporary, destination)
+        staged.clear()
+    finally:
+        for temporary, _ in staged:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def run():
+    arguments = parse_arguments()
+    if platform.system() != "Darwin" or platform.machine() != "arm64":
+        fail(
+            "this generator only binds the observed macOS arm64 M0 targets; "
+            f"observed {platform.system()} {platform.machine()}"
+        )
+
+    fixture_root = physical_directory(arguments.fixture_root, "fixture root")
+    artifact_file = read_bound_file(
+        arguments.artifact,
+        "M0 release hook artifact",
+        MAX_PRODUCT_ARTIFACT_BYTES,
+        executable=True,
+    )
+    artifact_path = artifact_file["absolute_path"]
+    artifact_bytes = artifact_file["bytes"]
+    core_artifact_file = read_bound_file(
+        arguments.core_artifact,
+        "M0 release core artifact",
+        MAX_PRODUCT_ARTIFACT_BYTES,
+        executable=True,
+    )
+    core_artifact_path = core_artifact_file["absolute_path"]
+    if (
+        artifact_path.name != "secure-onboard-m0-hook"
+        or core_artifact_path.name != "secure-onboard-m0-core"
+        or artifact_path.parent != core_artifact_path.parent
+    ):
+        fail("M0 release core must be the named physical sibling of the hook")
+    core_artifact_bytes = core_artifact_file["bytes"]
+
+    helpers = []
+    for role, relative_path in HELPERS:
+        content = read_relative_fixture(
+            fixture_root,
+            relative_path,
+            f"{role} helper fixture",
+        )
+        helpers.append(
+            {
+                "role": role,
+                "relative_path": relative_path,
+                "content_sha256": sha256_label(content),
+            }
+        )
+
+    invoked = {
+        "claude": arguments.claude_invoked,
+        "codex": arguments.codex_invoked,
+    }
+    documents = []
+    for target in TARGETS:
+        document = build_manifest(
+            fixture_root,
+            artifact_path,
+            artifact_bytes,
+            core_artifact_path,
+            core_artifact_bytes,
+            target,
+            invoked[target["client"]],
+            arguments.codex_runtime,
+            helpers,
+        )
+        documents.append((target["prefix"], document))
+
+    output_root = fixture_root / "manifests"
+    write_outputs(output_root, documents)
+    for prefix, _ in documents:
+        print(output_root / f"{prefix}.json")
+
+
+def main():
+    try:
+        run()
+    except GenerationError as error:
+        print(f"generate-m0-fixture-manifests: {error}", file=sys.stderr)
+        return 1
+    except OSError as error:
+        print(f"generate-m0-fixture-manifests: local I/O failure: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

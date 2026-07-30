@@ -1,0 +1,55 @@
+{
+  "description": "Secure Onboard M0 test-only hook tracer",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$PLUGIN_ROOT/bin/secure-onboard-m0-hook\" prompt --client codex --evidence-root __SECURE_ONBOARD_M0_EVIDENCE_ROOT__",
+            "timeout": 5,
+            "statusMessage": "Secure Onboard M0 prompt observation"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$PLUGIN_ROOT/bin/secure-onboard-m0-hook\" pre --client codex --profile __SECURE_ONBOARD_M0_TRUSTED_ROOT__/profiles/codex.json --trusted-root __SECURE_ONBOARD_M0_TRUSTED_ROOT__ --target-root __SECURE_ONBOARD_M0_TARGET_ROOT__ --state-root __SECURE_ONBOARD_M0_STATE_ROOT__ --evidence-root __SECURE_ONBOARD_M0_EVIDENCE_ROOT__ --test-case T-LIVE --test-run run-live --action-id action-live --envelope-id envelope-live-pre --decision-id decision-live --event-id-1 event-live-1 --event-id-2 event-live-2 --observed-at 2026-07-22T00:00:00Z --core-timeout-ms 3000 --core-fault none --cwd-binding unsupported-per-call-workdir --id-binding native-sha256",
+            "timeout": 5,
+            "statusMessage": "Secure Onboard M0 pre-tool check"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$PLUGIN_ROOT/bin/secure-onboard-m0-hook\" result --client codex --state-root __SECURE_ONBOARD_M0_STATE_ROOT__ --evidence-root __SECURE_ONBOARD_M0_EVIDENCE_ROOT__ --envelope-id envelope-live-result --observed-at 2026-07-22T00:00:01Z --event-id event-live-result --cwd-binding unsupported-per-call-workdir --id-binding native-sha256",
+            "timeout": 5,
+            "statusMessage": "Secure Onboard M0 result check"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$PLUGIN_ROOT/bin/secure-onboard-m0-hook\" stop --client codex --evidence-root __SECURE_ONBOARD_M0_EVIDENCE_ROOT__ --envelope-id envelope-live-stop --observed-at 2026-07-22T00:00:02Z --cwd-binding unsupported-per-call-workdir --id-binding native-sha256",
+            "timeout": 5,
+            "statusMessage": "Secure Onboard M0 stop check"
+          }
+        ]
+      }
+    ]
+  }
+}

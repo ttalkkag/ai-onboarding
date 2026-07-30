@@ -10,6 +10,7 @@
 | `osv.md` | OSV·악성 패키지 데이터의 의미, 한계와 후속 도입 선택지 |
 | `reverse-skill-harvest.md` | 수집 문서에서 가져올 수 있는 정적 탐지 아이디어 |
 | `capability-tiers.md` | 공용 로컬 코어와 선택 정적 도구 후보 |
+| `external-harness-harvest.md` | promptfoo·codex-security·인접 가드레일 조사와 기존 결정에 대한 diff |
 
 원자료는 `../draft/`에 보존한다. 원자료의 명령·도구·플로우는 검증 전까지 제품 기능이 아니다.
 

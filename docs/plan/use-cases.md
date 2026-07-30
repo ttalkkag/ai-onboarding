@@ -2,7 +2,7 @@
 
 이 문서는 구현 단계별 테스트 정본이다.
 
-- **M0:** 지금 구현을 시작할 수 있다. native hook 사실을 고정하는 tracer-bullet이다.
+- **M0:** test-only tracer 구현과 native 관찰을 완료했지만 모든 protection coverage가 제외됐다. 관찰 행렬은 `OBSERVATION_COMPLETE_WITH_EXCLUSIONS`, `verified=0`, `included=0`이다.
 - **M1:** npm/open/scan 범위, D13 제품 결정과 검사 실패 정책은 확정됐다. SQLite 세부 계약, resource/HMAC 계약, immutable fixture manifest와 expected JSON이 아직 없어 전체 구현은 시작하지 않는다.
 - **M2:** 심층 도달성·데이터 흐름·AI assessment를 다룬다.
 
@@ -46,7 +46,7 @@ failure rule:       guardrail.scan_failure
 | T02 | Codex shell/exec HIGH sentinel | `m0.sentinel.high`, HIGH, documented deny | `high_detected → high_blocked`; marker 없음, target process start 0 |
 | T03 | 두 CLI LOW sentinel을 test가 native approval | `m0.sentinel.low`, LOW continue | `warned_low → tool_completed`; 경고 시각 < target start, approval 자동 우회 0 |
 | T04 | 두 CLI INFO sentinel을 test가 native approval | `m0.sentinel.info`, INFO continue | `allowed_info → tool_completed`; target marker 1 |
-| T05-A | 고정 test clock에서 core timeout | `guardrail.scan_failure`, HIGH, adapter가 문서화된 deny 반환 | `high_detected → high_blocked`; target marker·process start 0 |
+| T05-A | 고정 test clock에서 core 3,000ms timeout | `guardrail.scan_failure`, HIGH, adapter가 문서화된 deny 반환 | `high_detected → high_blocked`; target marker·process start 0 |
 | T05-B | core child 고정 nonzero exit | `guardrail.scan_failure`, HIGH, adapter가 문서화된 deny 반환 | `high_detected → high_blocked`; target marker·process start 0 |
 | T05-C | core가 schema-invalid result 반환 | `guardrail.scan_failure`, HIGH, adapter가 문서화된 deny 반환 | `high_detected → high_blocked`; target marker·process start 0 |
 | T05-D | adapter executable spawn 실패 | client/version/OS별 native 결과를 최초 probe 뒤 단일 fixture로 고정 | 유효 deny가 없으면 보호 성공 주장 0 |
@@ -65,9 +65,9 @@ failure rule:       guardrail.scan_failure
 | T07 | LOW·INFO 병렬 tool call 두 개 | native tool call ID별 action/result correlation 유지 | 서로 다른 `action_id`; `warned_low/allowed_info`와 각 `tool_completed` 뒤섞임 0 |
 | T08 | Stop hook sentinel marker | 공식 `last_assistant_message`의 nullable 조건과 exact bytes fixture 캡처 | marker·digest fidelity와 OS별 결과 기록 |
 | T09 | 같은 event의 sibling hook이 marker를 기록 | 원래 HIGH target은 차단되지만 sibling 부작용 0은 주장하지 않음 | target marker 없음, sibling marker 관찰 가능 |
-| T10-LOW | LOW failure helper가 고정 nonzero 종료 | Claude `PostToolUseFailure`, Codex `PostToolUse` 실패 결과를 `tool_failed`로 정규화 | counts `HookEnvelope=2, M0ActionRequest=1, M0ActionDecision=1, M0Event=2`; events `warned_low → tool_failed(LOW,m0.sentinel.low,failure)`, native tool call ID 일치 |
-| T10-INFO | INFO failure helper가 고정 nonzero 종료 | 두 client의 실패 결과를 `tool_failed`로 정규화 | counts `2,1,1,2`; events `allowed_info → tool_failed(INFO,m0.sentinel.info,failure)`, native tool call ID 일치 |
-| T11 | Codex Stop이 exit 0 JSON `{"decision":"block","reason":"M0_CONTINUATION"}`을 반환해 생성한 자동 continuation과 실제 인간 prompt | 두 `UserPromptSubmit` raw bytes·`turn_id`, Stop의 `stop_hook_active`를 캡처; 공식 provenance 필드는 없으므로 기본 `unverified` | 별도 결정론적 증명 전 둘 다 `unverified`, 재확인 생성 0 |
+| T10-LOW | LOW failure helper가 고정 nonzero 종료 | Claude `PostToolUseFailure`는 `tool_failed`로 정규화. Codex CLI 0.146.0 `PostToolUse.tool_response`는 success와 failure가 모두 empty string이므로 result coverage 제외 | Claude counts `HookEnvelope=2, M0ActionRequest=1, M0ActionDecision=1, M0Event=2`; events `warned_low → tool_failed(LOW,m0.sentinel.low,failure)`, native tool call ID 일치. Codex result event 0 |
+| T10-INFO | INFO failure helper가 고정 nonzero 종료 | Claude 실패 결과만 `tool_failed`로 정규화. Codex CLI 0.146.0은 T10-LOW와 같은 이유로 result coverage 제외 | Claude counts `2,1,1,2`; events `allowed_info → tool_failed(INFO,m0.sentinel.info,failure)`, native tool call ID 일치. Codex result event 0 |
+| T11 | Codex Stop이 exit 0 JSON `{"decision":"block","reason":"M0_CONTINUATION"}`을 반환해 생성한 자동 continuation과 최초 인간 prompt | 최초 `UserPromptSubmit` 1개, 같은 turn의 Stop 2개와 `stop_hook_active=false → true`, 두 번째 local API 요청의 `<hook_prompt>`를 캡처. 자동 continuation의 두 번째 `UserPromptSubmit`은 관찰되지 않음 | 공식 provenance 필드가 없으므로 최초 prompt와 continuation source 모두 `unverified`, 재확인 생성 0 |
 | T12 | 자체 scope ON이지만 현재 세션 heartbeat/trust 근거 없음 | 유효 보호 `UNKNOWN` | ACTIVE/OFF로 추정하지 않고 `next_checks` 고정 enum 1개 이상 |
 | T13 | Codex plugin installed/enabled지만 bundled hook current hash 미신뢰 | hook skip, 유효 보호 `UNKNOWN` | `hook_evidence=skipped/unreviewed_definition`, self-test event 0; 설치 상태만으로 active 주장 0 |
 | T14 | Codex current hook definition을 검토·trust했지만 기존 session 유지 | 현재 session active를 추정하지 않음 | `session_state=existing_before_review`, hook `skipped/session_predates_review`; 새 session 전 `UNKNOWN` |
@@ -76,20 +76,20 @@ failure rule:       guardrail.scan_failure
 | T17 | untrusted project의 project-local `.codex` hook이 Secure Onboard를 사칭 | project-local hook skip; trusted user plugin 상태와 분리 | source별 `hook_evidence`; 사칭 event 0, heartbeat/self-test는 user plugin의 session·digest에만 결속 |
 | T18 | Codex session cwd와 unified exec per-call workdir이 다른 호출 | native hook 또는 위조 불가능한 runtime 입력이 effective cwd를 path 전체에서 식별·재검증할 수 있는지 측정 | 증명 불가 시 해당 native path·client version 전체 coverage 제외; session cwd를 effective cwd로 오인 0 |
 | T19-A-HIGH | test artifact + valid user-area profile + exact HIGH helper | HIGH sentinel 활성 | counts `HookEnvelope=1, M0ActionRequest=1, M0ActionDecision=1, M0Event=2, M0StatusReport=1`; binding `matched`, events `high_detected → high_blocked` |
-| T19-A-LOW | test artifact + 같은 valid profile + exact LOW helper | LOW sentinel 활성 | counts `2,1,1,2,1`; binding `matched`, events `warned_low → tool_completed` |
-| T19-A-INFO | test artifact + 같은 valid profile + exact INFO helper | INFO sentinel 활성 | counts `2,1,1,2,1`; binding `matched`, events `allowed_info → tool_completed` |
+| T19-A-LOW | test artifact + 같은 valid profile + exact LOW helper | LOW sentinel 활성 | Claude counts `2,1,1,2,1`, events `warned_low → tool_completed`; Codex 0.146.0 counts `1,1,1,1,1`, event `warned_low`만 기록하고 ambiguous result는 제외. binding `matched` |
+| T19-A-INFO | test artifact + 같은 valid profile + exact INFO helper | INFO sentinel 활성 | Claude counts `2,1,1,2,1`, events `allowed_info → tool_completed`; Codex 0.146.0 counts `1,1,1,1,1`, event `allowed_info`만 기록하고 ambiguous result는 제외. binding `matched` |
 | T19-B-MISSING | test artifact loader-only run + profile 입력 없음 | `test_profile=rejected`, sentinel 비활성 | counts `0,0,0,0,1`; supplied digest null, reason `profile_missing`, binding `not_evaluated` |
 | T19-B-DIGEST | test artifact loader-only run + profile bytes 1개 변경 | `test_profile=rejected`, sentinel 비활성 | counts `0,0,0,0,1`; supplied/expected digest 불일치, reason `digest_mismatch`, binding `not_evaluated` |
 | T19-B-SOURCE | test artifact loader-only run + valid profile bytes를 target repo 경로에서 공급 | `test_profile=rejected`, sentinel 비활성 | counts `0,0,0,0,1`; 두 digest가 같아도 reason `profile_source_untrusted`, binding `not_evaluated` |
-| T19-B-HELPER | loaded valid profile + 같은 fixed path/argv의 helper bytes만 고정 near-match hash로 교체 | profile은 loaded지만 sentinel 불일치 | counts `2,0,0,0,1`; binding `helper_hash_mismatch`, documented neutral native response 뒤 operator approval과 target marker 1 |
-| T19-B-ARGV | loaded valid profile + exact helper에 고정 no-op extra argv 1개 | profile은 loaded지만 sentinel 불일치 | counts `2,0,0,0,1`; binding `argv_mismatch`, documented neutral native response 뒤 operator approval과 target marker 1 |
+| T19-B-HELPER | loaded valid profile + 같은 fixed path/argv의 helper bytes만 고정 near-match hash로 교체 | profile은 loaded지만 sentinel 불일치 | Claude counts `2,0,0,0,1`, Codex 0.146.0 counts `1,0,0,0,1`; binding `helper_hash_mismatch`, documented neutral native response 뒤 operator approval과 target marker 1 |
+| T19-B-ARGV | loaded valid profile + exact helper에 고정 no-op extra argv 1개 | profile은 loaded지만 sentinel 불일치 | Claude counts `2,0,0,0,1`, Codex 0.146.0 counts `1,0,0,0,1`; binding `argv_mismatch`, documented neutral native response 뒤 operator approval과 target marker 1 |
 | T19-C | production artifact loader-only run + T19-A의 exact profile 입력 | profile 미지원 | counts `0,0,0,0,1`; supplied digest 필수, reason `production_not_supported`, binding `not_evaluated`, bound build manifest + black-box profile probe evidence |
 | T20-A | HIGH deny 응답에 top-level `systemMessage`를 함께 반환 | deny 경로에서 경고가 사용자 표시로 렌더되는지 측정 | 표시 여부·위치·최대 길이·개행 처리의 관찰 원문 |
 | T20-B | LOW: permission decision 없이 `systemMessage`만 반환 | 경고가 target 실행 전에 사용자에게 표시되는지 측정 | 표시 시각 < target start 여부; 표시가 불가능하면 `guardrail.warning_failure` 적용 근거 |
 | T20-C | `systemMessage`에 짧은 ref와 exact 재확인 문구를 포함 | 문구가 잘리거나 변형되지 않고 그대로 표시되는지 측정 | 입력 bytes와 표시 bytes 대조 결과 |
 | T20-D | Codex `systemMessage`의 도달 경로 | 대화형 터미널 세션의 사용자 표시인지 event stream 전용인지 구분 | client별 관찰 결과 원문 |
 
-T19 표의 count 순서는 항상 `HookEnvelope, M0ActionRequest, M0ActionDecision, M0Event, harness M0StatusReport`다. LOW·INFO와 B-HELPER/B-ARGV의 첫 HookEnvelope는 PreToolUse, 둘째는 정확히 같은 native tool call ID의 result다. B-HELPER는 path와 argv를 유지한 채 helper content hash만, B-ARGV는 exact helper path/content를 유지한 채 no-op argv 하나만 바꾼다. 두 near-match target의 bytes/hash와 성공 marker 동작을 manifest에 고정한다. adapter는 profile matcher 불일치를 판정이나 event로 승격하지 않고 client별 documented neutral response만 반환한다. control run에서 native approval이 필요함을 먼저 증명하고 operator가 한 번 승인한다. target 실행은 예상된 negative evidence이지 보호 성공이 아니다. B-MISSING/B-DIGEST/B-SOURCE/C만 loader-only다. production binary는 M0 schema를 emit하지 않으며 T19-C의 status 1개는 harness가 만든 projection이다.
+T19 표의 count 순서는 항상 `HookEnvelope, M0ActionRequest, M0ActionDecision, M0Event, harness M0StatusReport`다. Claude LOW·INFO와 B-HELPER/B-ARGV의 첫 HookEnvelope는 PreToolUse, 둘째는 정확히 같은 native tool call ID의 result다. Codex 0.146.0의 `PostToolUse.tool_response`는 success/failure 모두 empty string이라 normalized result envelope/event를 만들지 않는다. B-HELPER는 path와 argv를 유지한 채 helper content hash만, B-ARGV는 exact helper path/content를 유지한 채 no-op argv 하나만 바꾼다. 두 near-match target의 bytes/hash와 성공 marker 동작을 manifest에 고정한다. adapter는 profile matcher 불일치를 판정이나 event로 승격하지 않고 client별 documented neutral response만 반환한다. control run에서 native approval이 필요함을 먼저 증명하고 operator가 한 번 승인한다. target 실행은 예상된 negative evidence이지 보호 성공이 아니다. B-MISSING/B-DIGEST/B-SOURCE/C만 loader-only다. production binary는 M0 schema를 emit하지 않으며 T19-C의 status 1개는 harness가 만든 projection이다.
 
 M0 fixture manifest는 각 클라이언트·지원 버전·OS별로 다음을 체크인한다.
 
@@ -108,11 +108,11 @@ exact systemMessage input bytes and the observed user-visible rendering per clie
 exact deny/continue stdout, stderr and exit status
 target marker path and process-observation method
 test_case_id/test_run_id and exact count of each normalized HookEnvelope, M0ActionRequest, M0ActionDecision, M0Event and harness M0StatusReport
-canonical JSON SHA-256 list for every expected object; this list binds shared HookEnvelope objects without M0-only fields to the test_run_id
+canonical JSON SHA-256 list for every expected input/output object; `run_evidence`는 HookEnvelope·request·decision·event digest를 `test_run_id`에 결속하고 완성된 status 자신의 digest는 harness 결과의 별도 `status_report_digest`로 결속한다
 expected ordered events and forbidden observations
 ```
 
-fixture manifest와 한 번의 harness run context가 M0 evidence의 결속 정본이며 `M0StatusReport`는 그 증거의 machine-readable projection이다. 같은 `test_run_id`의 object count·canonical digest list·ordered event 중 하나라도 다르면 해당 case 전체가 실패다.
+fixture manifest와 한 번의 harness run context가 M0 evidence의 결속 정본이며 `M0StatusReport.run_evidence`는 그 증거의 machine-readable projection이다. 같은 `test_run_id`의 object count·canonical digest list·별도 status digest·ordered event 중 하나라도 다르면 해당 case 전체가 실패다. Rust deterministic harness의 process·marker·approval count는 instrumented core oracle일 뿐 native live process 증거를 대체하지 않는다.
 
 T03·T04는 같은 client/version/OS에서 plugin을 끈 control run이 native approval prompt를 실제로 요구함을 먼저 기록한다. plugin을 켠 run에서는 test operator가 그 prompt를 한 번 직접 승인하며 Secure Onboard 코드가 approval 입력을 보내거나 생략하면 실패다.
 

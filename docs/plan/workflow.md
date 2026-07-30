@@ -1,6 +1,6 @@
 # AI CLI 실행 게이트 플로우
 
-> 상태: **M0 검증 뒤 잠글 M1 상태 전이 초안**. 실행 oracle의 정본은 `use-cases.md`다.
+> 상태: **M0 관찰 완료-with-exclusions / M1 상태 전이 후보 계약**. M0의 검증된 보호 coverage는 0이며, 아래 production 흐름은 M1 GO 전에 구현하지 않는다. 실행 oracle의 정본은 `use-cases.md`다.
 
 ## 전체 상태기계
 
@@ -272,4 +272,4 @@ HIGH 명령 제공 뒤 사용자가 일반 터미널에서 실행하는 것은 �
 - `executed`, `tool_completed`, `tool_failed`를 만들지 않음
 - “이 판정은 명령을 표시한 시점의 cwd·환경·대상 상태에만 해당한다”고 안내
 
-LOW·INFO에서 result hook으로 관찰한 작업만 결과 이벤트를 기록한다. Claude Code는 성공 `PostToolUse`와 실패 `PostToolUseFailure`, Codex는 `PostToolUse`의 결과를 어댑터가 공통 outcome으로 변환한다. 결과 훅은 실행 전 차단 수단으로 사용하지 않는다.
+LOW·INFO에서 result hook으로 관찰하고 outcome을 신뢰할 수 있게 정규화한 작업만 결과 이벤트를 기록한다. Claude Code는 성공 `PostToolUse`와 실패 `PostToolUseFailure`를 공통 outcome으로 변환한다. Codex는 지원 exact version의 `PostToolUse`가 success/failure를 구분하는 native 값을 제공할 때만 결과 coverage에 포함한다. Codex CLI 0.146.0의 success와 exit 23 failure는 모두 exact `tool_response=""`였으므로 adapter가 `UnverifiedCodexResult`로 거부하며 `tool_completed`나 `tool_failed`를 만들지 않는다. 결과 훅은 실행 전 차단 수단으로 사용하지 않는다.

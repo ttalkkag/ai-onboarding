@@ -1,0 +1,46 @@
+{
+  "schema_version": "m0-test-profile/v1",
+  "build_flavor": "test",
+  "client": "claude",
+  "client_version": "2.1.220",
+  "os": "macos",
+  "architecture": "arm64",
+  "fixture_runtime": {
+    "executable_path": "/opt/homebrew/Cellar/node/26.5.0/bin/node",
+    "executable_sha256": "sha256:70851490e028b3d699a8d6d4e1de909af2a989359ae807974c92af9c6580a8e8",
+    "version_output": "v26.5.0"
+  },
+  "shell_binding": {
+    "executable_path": "/bin/zsh",
+    "executable_sha256": "sha256:1f473d234dd65157f530b4f676686517ec97fe9aa64c76d82f2611674cc44314",
+    "flags": [
+      "-lc"
+    ],
+    "dialect": "posix_sh",
+    "resolution_fingerprint": "sha256:432334cf54611c3d90f428d656721a8919dc591f398ef34f8c7b997b2879ccd0"
+  },
+  "helpers": [
+    {
+      "role": "default",
+      "relative_path": "helpers/m0-target.mjs",
+      "content_sha256": "sha256:93363a6f9b50deab9ac978ec0f84fdb8009bfbaa18563dc8553dd024454a9f0a",
+      "command_grammar": "posix_ascii_argv4/v1",
+      "allowed_sentinels": [
+        "high",
+        "low",
+        "info"
+      ]
+    },
+    {
+      "role": "failure",
+      "relative_path": "helpers/m0-target-fail.mjs",
+      "content_sha256": "sha256:0e071e544324782608c01d643262d3dd45b378b4f65e43433ef44d7ae0354c0c",
+      "command_grammar": "posix_ascii_argv4/v1",
+      "allowed_sentinels": [
+        "low",
+        "info"
+      ]
+    }
+  ],
+  "marker_root_relative": "markers"
+}

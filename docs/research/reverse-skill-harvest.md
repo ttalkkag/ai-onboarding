@@ -70,7 +70,7 @@ reverse-skill 큐레이션본(13개 모듈, md 71개)을 정독해 **스캐너 �
 - **[채택후보] 과도한 에이전시** — `exec/shell/delete/send_email/query_db` 도구가 모델제어 파라미터에 배선 + 승인 게이트 없음
 - **[채택후보] 시스템 프롬프트 내 시크릿** — 프롬프트 템플릿에 API Key 하드코딩
 - **[원칙(탐지 아님)] 스캐너 자기 하드닝** — 스캐너가 LLM으로 미지 프로젝트를 읽을 때 그 텍스트(README/주석)가 스캐너를 탈취하지 않게 *모든 자연어 입력 = 불신*. → proposal S5
-- **[제품 밖] garak/PyRIT/promptfoo 라이브 프로빙** — 동적 레드팀이므로 수행하지 않는다.
+- **[제품 밖] garak/PyRIT/promptfoo 라이브 프로빙** — 동적 레드팀이므로 수행하지 않는다. 2026-07-30 재조사에서도 이 판정은 유지됐다. promptfoo에서 참고할 부분은 제품 런타임이 아니라 fixture 기반 회귀 구조뿐이며 근거는 `external-harness-harvest.md`에 있다.
 
 ## 7. 웹 / API (api-security — 선택 정적 프로파일)
 

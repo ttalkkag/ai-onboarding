@@ -103,6 +103,60 @@ AI 실행 예정 명령어:
 
 모든 ID는 같은 사용자·세션 밖에서 의미를 추측할 수 없는 값으로 만든다.
 
+### 3.0 `M0TestProfile v1`
+
+M0 test artifact가 sentinel을 활성화하는 유일한 입력은 다음 strict schema의 exact UTF-8 bytes다. 아래 값은 필드 계약 예시이며 실제 지원값은 client별 fixture 파일에 기록한다.
+
+```json
+{
+  "schema_version": "m0-test-profile/v1",
+  "build_flavor": "test",
+  "client": "codex",
+  "client_version": "M0_FIXED_VERSION",
+  "os": "macos",
+  "architecture": "arm64",
+  "fixture_runtime": {
+    "executable_path": "/absolute/path/to/node",
+    "executable_sha256": "sha256:fixture-runtime",
+    "version_output": "vM0_FIXED_VERSION"
+  },
+  "shell_binding": {
+    "executable_path": "/bin/zsh",
+    "executable_sha256": "sha256:physical-shell-bytes",
+    "flags": ["-lc"],
+    "dialect": "posix_sh",
+    "resolution_fingerprint": "sha256:effective-shell"
+  },
+  "helpers": [
+    {
+      "role": "default",
+      "relative_path": "helpers/m0-target.mjs",
+      "content_sha256": "sha256:default-helper",
+      "command_grammar": "posix_ascii_argv4/v1",
+      "allowed_sentinels": ["high", "low", "info"]
+    },
+    {
+      "role": "failure",
+      "relative_path": "helpers/m0-target-fail.mjs",
+      "content_sha256": "sha256:failure-helper",
+      "command_grammar": "posix_ascii_argv4/v1",
+      "allowed_sentinels": ["low", "info"]
+    }
+  ],
+  "marker_root_relative": "markers"
+}
+```
+
+모든 object는 위 key를 정확히 한 번씩 가지며 additional field를 거부한다. `helpers`는 `default`, `failure`가 이 순서로 정확히 한 번씩 있어야 하고 `allowed_sentinels`도 예시의 순서·값과 같아야 한다. 문자열은 Unicode normalization을 하지 않고 JSON decode 결과의 UTF-8 bytes를 그대로 비교한다. profile 파일 자체는 UTF-8 BOM이 없는 JSON object 하나와 마지막 LF 하나로 끝나며, compile-time digest와 supplied digest는 **그 LF를 포함한 전체 파일 bytes**의 SHA-256이다. JSON duplicate key, invalid UTF-8, trailing non-whitespace와 심볼릭 링크 profile path는 거부한다.
+
+M0 macOS fixture의 `posix_ascii_argv4/v1`은 shell text 전체가 `runtime-path U+0020 helper-path U+0020 sentinel U+0020 marker-path`인 정확히 네 token인 grammar다. leading/trailing whitespace, 연속 whitespace, quote, backslash, 제어문자와 shell metacharacter `;&|<>()$`를 허용하지 않는다. runtime token은 profile의 exact absolute path와 같고 helper token은 harness가 제공한 physical trusted root와 `relative_path`를 결합한 path와 byte-for-byte 같아야 한다. sentinel은 해당 helper allow-list에 있어야 하며, marker는 symlink를 거치지 않은 `<trusted-root>/<marker_root_relative>/<test_run_id>/<test_case_id>.marker`의 physical path여야 한다. Windows 또는 공백을 포함한 path grammar는 M0 실증 뒤 새 schema version으로 추가하며 이 버전에서 추정 지원하지 않는다.
+
+`fixture_runtime.executable_path`와 shell path는 절대 physical path다. helper `relative_path`와 `marker_root_relative`는 absolute path, `.`, `..`, symlink를 허용하지 않고 매 실행의 사용자 전용 trusted root 아래에서만 해석한다. runtime hook이 읽는 trusted root와 `profiles`, `helpers`, marker directory chain은 현재 effective user 소유 0700이고 profile/helper file은 같은 user 소유 0600이어야 한다. 저장소에 체크인한 0755/0644 fixture 원본은 증거·복사 source일 뿐 runtime trusted root로 직접 로드하지 않으며, native harness가 0700/0600 private copy를 만든 뒤 hook에 넘긴다.
+
+profile/runtime/helper/shell bytes의 SHA-256은 leaf에 `O_NOFOLLOW`를 적용해 연 같은 physical file descriptor를 64KiB chunk로 읽고, 읽기 전후 descriptor·path metadata와 canonical path가 그대로인지 확인한다. 총 byte 상한은 profile 64KiB, helper 1MiB, fixture runtime과 shell 각각 64MiB다. profile load는 두 helper를 모두 검사하고 실제 command match 직전 선택된 helper를 다시 검사한다. `fixture_runtime.version_output`은 fixture manifest 생성 시 그 physical runtime의 `--version` raw stdout에서 마지막 LF만 제외해 관찰한 값이다. action마다 `--version`을 다시 실행하지는 않으며, 같은 runtime bytes digest를 재검증해 그 생성 시점 관찰과 결속한다.
+
+`shell_binding.resolution_fingerprint`는 M0 host-process probe에서 고정한 executable path·flags·dialect 조합의 observation label이고 shell executable bytes의 digest가 아니다. `executable_sha256`이 exact shell bytes를 별도로 결속하며, 두 값과 physical path를 action마다 모두 재검증한다. 이 test-only 결속만으로 native effective shell 지원을 주장하지 않고 별도 live evidence가 생기기 전까지 coverage의 `verified`와 `included`는 0으로 유지한다. profile path는 target project의 physical root 밖에 있어야 하며 source 검증 전에 target project가 제공한 environment나 설정으로 위치를 바꾸지 않는다. M0의 portable Rust reader와 macOS 전용 생성기는 leaf FD 및 전후 identity를 결속하지만 parent directory chain을 dirfd로 잠그지는 않는다. 따라서 동시 parent rename/symlink 교체를 커널 수준에서 제거했다고 주장하지 않으며 이 잔여 TOCTOU 때문에 protection coverage를 확대하지 않는다.
+
 ### 3.1 M0 전용 증거 스키마
 
 M0는 아직 정하지 않은 production registry·GatePolicy·CoverageManifest·HMAC key를 만들지 않는다. `HookEnvelope`의 native mapping 뒤에는 아래 test-only 스키마를 사용하며, production `ActionRequest v1`, `LocalEvent v1`, `StatusReport v1`의 성공으로 계산하지 않는다. exact test-profile UTF-8 bytes의 SHA-256과 fixture의 고정 clock·placeholder ID만 사용하고 비밀값·실사용자 데이터는 넣지 않는다.
@@ -179,12 +233,24 @@ M0는 아직 정하지 않은 production registry·GatePolicy·CoverageManifest�
   "schema_version": "m0-status-report/v1",
   "phase": "m0",
   "report_source": "test_harness",
-  "test_case_id": "T15",
-  "test_run_id": "m0-run-t15-01",
+  "test_case_id": "T19-A-HIGH",
+  "test_run_id": "m0-run-t19-a-high-01",
   "client": "codex",
   "client_version": "M0_FIXED_VERSION",
   "plugin_version": "M0_FIXED_PLUGIN_VERSION",
   "os": "macos",
+  "architecture": "arm64",
+  "client_executable": {
+    "invoked_path": "/absolute/path/to/codex",
+    "resolved_path": "/absolute/path/to/codex-native",
+    "sha256": "sha256:codex-native",
+    "version_output": "codex-cli M0_FIXED_VERSION"
+  },
+  "client_runtime_artifact": {
+    "role": "native_backend",
+    "absolute_path": "/absolute/path/to/codex-native-backend",
+    "sha256": "sha256:codex-native-backend"
+  },
   "artifact_kind": "test",
   "artifact_digest": "sha256:m0-test-artifact",
   "configured_scope_fixture": "ON",
@@ -240,6 +306,32 @@ M0는 아직 정하지 않은 production registry·GatePolicy·CoverageManifest�
   "test_profile_rejection_reason": null,
   "sentinel_binding_result": "matched",
   "next_checks": [],
+  "run_evidence": {
+    "object_counts": {
+      "hook_envelope": 1,
+      "m0_action_request": 1,
+      "m0_action_decision": 1,
+      "m0_event": 2,
+      "m0_status_report": 1
+    },
+    "canonical_digests": {
+      "hook_envelope": ["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+      "m0_action_request": ["sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+      "m0_action_decision": ["sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
+      "m0_event": [
+        "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ]
+    },
+    "ordered_events": ["high_detected", "high_blocked"],
+    "observations": {
+      "target_process_start_count": 0,
+      "target_marker_count": 0,
+      "operator_approval_count": 0,
+      "secure_onboard_approval_count": 0,
+      "uncorrelated_result_count": 0
+    }
+  },
   "artifact_inspection": null,
   "reasons": [],
   "limitations": [
@@ -250,6 +342,10 @@ M0는 아직 정하지 않은 production registry·GatePolicy·CoverageManifest�
 ```
 
 `sentinel`은 `high|low|info`이며 severity/gate/rule 조합은 각각 `HIGH/deny/m0.sentinel.high`, `LOW/continue/m0.sentinel.low`, `INFO/continue/m0.sentinel.info`다. 모든 `M0ActionDecision.pending_action_ref`는 null이다. 성공 helper의 ordered event는 HIGH `high_detected → high_blocked`, LOW `warned_low → tool_completed`, INFO `allowed_info → tool_completed`로 고정한다. core child 장애는 `severity=HIGH`, `gate_decision=deny`, `rule_id=guardrail.scan_failure`, `decision_source=adapter_fallback`, 고정 `failure_code=core_timeout|core_nonzero|core_schema_invalid`, event `high_detected → high_blocked`다. 다른 result outcome은 개별 T case가 정확히 하나의 event variant를 고정한다. `m0-event`는 production local history에 쓰지 않는다.
+
+LOW·INFO result correlation은 사용자 전용 state root에서 `prepared → delivered` 두 단계로 유지한다. PreToolUse는 native 응답을 stdout에 쓰고 flush한 뒤 해당 envelope/request/decision/event/native-output evidence를 모두 기록하며, 마지막에 prepared decision bytes의 domain-separated SHA-256을 담은 delivered marker를 `create_new`로 만든다. result hook은 decision과 marker가 모두 존재하고 marker digest가 decision bytes와 일치할 때만 결과 event를 만든다. stdout 또는 post-response evidence가 실패하거나 그 사이 process가 종료되면 prepared file만 남고 result는 이를 소비하지 않으며 pre hook은 native blocking exit 2로 끝난다. 동일 decision의 중복 호출은 같은 marker를 idempotent하게 확인하고 실패한 호출이 다른 호출의 delivered 상태를 삭제하지 않는다.
+
+M0 core child는 native hook의 5초 제한보다 짧은 최대 4초 deadline 안에서 실행한다. Unix에서는 child를 별도 process group으로 시작하고 정상 종료·timeout·`try_wait` 오류 모두에서 남은 group을 `SIGKILL`로 정리한 뒤 직접 child를 reap하고 stdin/stdout/stderr worker를 join한다. 따라서 같은 group에서 pipe를 상속한 descendant가 core timeout을 native hook timeout까지 늘릴 수 없다. non-Unix의 process-tree 종료는 M0에서 검증하지 않았으며 해당 조합을 coverage에 포함하지 않는다.
 
 `M0Event`는 예시의 모든 top-level 필드를 항상 유지한다. event별 유효 조합은 다음뿐이다.
 
@@ -267,12 +363,18 @@ M0는 아직 정하지 않은 production registry·GatePolicy·CoverageManifest�
 
 | 조건 | 필수/nullable 규칙 |
 |------|--------------------|
-| 공통 | `report_source=test_harness`, `test_case_id`, 한 harness invocation의 고유 `test_run_id`, `client`, nullable exact `client_version|plugin_version`, `os=macos|windows`, `artifact_kind=test|production`, `artifact_digest`, `configured_scope_fixture=ON|OFF|null`, `plugin_installed=true|false|null`, `hooks_enabled=true|false|null`, `client_mode_evidence`, native plugin/hook evidence, `effective_protection`, `sentinel_binding_result`, `next_checks`, nullable `artifact_inspection`, `reasons`, `limitations` 필수. production binary가 이 스키마를 emit하지 않고 harness가 관찰 증거로 report를 만든다. |
+| 공통 | `report_source=test_harness`, `test_case_id`, 한 harness invocation의 고유 `test_run_id`, `client`, nullable exact `client_version|plugin_version`, `os=macos|windows`, `architecture=arm64|x86_64`, `client_executable`, `client_runtime_artifact`, `artifact_kind=test|production`, `artifact_digest`, `configured_scope_fixture=ON|OFF|null`, `plugin_installed=true|false|null`, `hooks_enabled=true|false|null`, `client_mode_evidence`, native plugin/hook evidence, `effective_protection`, `sentinel_binding_result`, `next_checks`, nullable `run_evidence|artifact_inspection`, `reasons`, `limitations` 필수. `client_executable`은 exact `invoked_path`, symlink를 해소한 `resolved_path`, resolved file bytes의 `sha256`, 마지막 LF를 제외한 exact `--version` stdout `version_output`을 모두 가진다. `client_runtime_artifact`는 manifest §3.3과 같은 role/path/hash를 가지며 Claude `resolved_executable`은 resolved launcher와 같고 Codex `native_backend`는 별도 platform binary를 결속한다. `client_version`은 version 출력에서 client별 고정 parser로 얻은 값과 같아야 한다. production binary가 이 스키마를 emit하지 않고 harness가 관찰 증거로 report를 만든다. |
 | client mode | `client_mode_evidence`는 모든 하위 필드를 유지한다. `plugin_state=installed_enabled|installed_disabled|not_installed|unknown`이다. `not_installed`이면 top-level `plugin_installed=false`, `plugin_version=null`, `hooks_enabled=false`, `effective_protection=OFF`; `installed_disabled`이면 `plugin_installed=true`, `hooks_enabled=false`, `effective_protection=OFF`다. Codex는 `launch_mode=normal|unknown`, `explicit_plugin_supplied=null`, `disable_all_hooks=null`, `codex_hooks_feature=enabled|disabled|unknown`이다. Claude는 `launch_mode=normal|claude_bare|claude_simple|unknown`, `explicit_plugin_supplied=true|false|null`, `disable_all_hooks=true|false|null`, `codex_hooks_feature=not_applicable`이다. `setting_evidence[]`는 높은 effective precedence부터 정렬하고 각 항목은 `source=codex_user_config|codex_project_config|claude_user_settings|claude_project_settings|claude_local_settings|claude_managed_settings`, exact `source_digest`, `claim=codex_hooks_feature_enabled|codex_hooks_feature_disabled|claude_disable_all_hooks_true|claude_disable_all_hooks_false`를 가진다. client가 다른 source/claim 또는 같은 effective precedence의 충돌 claim은 invalid다. `disable_all_hooks`와 Codex feature는 각각 첫 applicable claim과 같아야 한다. `evidence_digest`는 exact launch argv, plugin-list output과 전체 ordered setting evidence를 묶은 자체 SHA-256이다. plugin state·launch mode·explicit plugin·disableAllHooks·Codex feature 중 하나라도 unknown/null이 아닌 관찰값이면 non-null이어야 한다. Claude `disable_all_hooks=true`, bare/simple이면서 explicit plugin이 false, Codex hooks feature disabled 중 하나면 `hooks_enabled=false`, `effective_protection=OFF`; 근거가 불완전하면 둘은 `null|UNKNOWN`이다. |
 | hook definition | `hook_evidence[]` 각 항목은 `source=codex_user_plugin|codex_user_config|codex_project_config|claude_user_plugin|claude_project_plugin|claude_local_plugin|claude_user_settings|claude_project_settings|claude_local_settings|claude_managed_settings`, exact 자체 SHA-256 `definition_digest`, `disposition=loaded_active|skipped`, `reason=selected_reviewed_definition|selected_enabled_source|unreviewed_definition|reviewed_digest_stale|session_predates_review|untrusted_project_source|hooks_disabled`를 모두 가진다. `heartbeat|self_test.hook_source`도 같은 enum이며 client가 다른 source는 schema-invalid다. `bundled_hook_definition_digest|reviewed_hook_definition_digest`는 검사 artifact의 bundled bytes와 마지막 제품 검토 대상 exact bytes의 자체 SHA-256이며 확인할 수 없으면 null이다. `product_hook_review=unverified|verified|stale|not_applicable`; Codex user plugin definition과 reviewed가 같을 때만 `verified`, 과거 reviewed 값과 다르면 `stale`다. Claude는 native source/enable 증거를 `hook_evidence`와 `selected_enabled_source`로 분리하고 이 Codex 전용 review 값은 `not_applicable`로 둔다. Codex 내부 trust hash로 표현하지 않는다. |
 | session | `session_fixture_id`는 known session에서 필수이며 `session_state=existing_before_review|new_after_review|unknown`이다. `heartbeat|self_test.status=not_run|passed|failed|stale`, `evidence_scope=current|historical|none`이다. `passed/current`는 같은 object의 `session_fixture_id|hook_source|hook_definition_digest`가 모두 non-null이고 top-level session 및 정확히 하나의 `loaded_active` hook evidence와 일치해야 한다. `stale/historical`은 과거 non-null session/source/digest 결속을 보존하며 현재 top-level session 또는 `loaded_active` hook과 일치해서는 안 된다. `not_run/none`은 세 결속 필드가 모두 null이다. `failed`는 실패 전에 관찰한 값만 `current`로 non-null이며 그 전이면 `none`이고 fixture가 exact nullability를 고정한다. `client_trust=verified|unverified|unknown|not_applicable`, `effective_protection=VERIFIED_ACTIVE|OFF|UNKNOWN`이다. |
 | test artifact | `test_profile_expected_digest`는 compile-time 값으로 필수. 입력이 없으면 supplied digest null, `rejected/profile_missing`이다. 입력이 있으면 supplied digest 필수이며 byte digest나 user-area source가 틀리면 `rejected/digest_mismatch|profile_source_untrusted`다. profile이 valid하면 `loaded`와 rejection reason null이다. 그 run의 runtime helper/argv가 모두 일치하면 `sentinel_binding_result=matched`, helper hash가 다르면 `helper_hash_mismatch`, argv가 다르면 `argv_mismatch`, loader-only이면 `not_evaluated`다. |
 | production artifact | exact profile 입력을 시도한 T19-C에서는 `test_profile=not_supported`, `test_profile_expected_digest=null`, supplied digest 필수, `test_profile_rejection_reason=production_not_supported`, `sentinel_binding_result=not_evaluated`다. `artifact_inspection`은 3.2의 exact build/probe evidence를 포함한다. production binary에는 loader/rule/status constructor가 없어야 하며 모든 M0 action/event schema count는 0이다. |
+
+`run_evidence`는 T19-A/B/C에서만 non-null이고 다른 M0 status case에서는 null이다. `object_counts`는 `HookEnvelope|M0ActionRequest|M0ActionDecision|M0Event|M0StatusReport`를 각각 세며 status count는 항상 1이다. `canonical_digests`는 자기 참조를 피하기 위해 앞의 네 object 종류만 실제 object 순서대로 담고, harness가 완성된 report의 canonical SHA-256을 별도 `status_report_digest` 결과로 반환해 다섯 번째 digest를 완성한다. `ordered_events`는 `M0Event` 배열의 순서와 같아야 한다. `observations`는 target process·marker, 사람 승인, Secure Onboard 승인 자동화와 uncorrelated result의 계측 count다.
+
+result-bearing T19 oracle은 client별 native mapper 사실을 따른다. Claude는 correlated result HookEnvelope와 `tool_completed`를 포함하지만, Codex 0.146.0은 ambiguous empty `tool_response`를 result로 정규화하지 않아 LOW·INFO와 near-match의 result HookEnvelope/event count가 0이다.
+
+이 Rust deterministic harness의 process·marker·approval count는 격리된 instrumented test 입력에 대한 oracle이며 실제 Claude/Codex process observer 결과를 뜻하지 않는다. native live 증거가 없거나 observer가 차단된 조합을 이 값으로 `VERIFIED` 처리하지 않는다.
 
 `client_mode_evidence.evidence_digest`는 임의 문자열 연결이 아니다. exact bytes는 `SHA-256(ASCII("secure-onboard:m0-client-mode-evidence/v1\n") || JCS(input))`로 계산한다. `JCS`는 [RFC 8785 JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785)이고 `input`은 다음 고정 key를 모두 가진다.
 
@@ -326,6 +428,113 @@ T19-C의 harness는 production artifact를 만든 **같은 build transaction**�
 ```
 
 canonical component manifest는 build graph가 포함한 feature/component ID의 정렬 UTF-8 목록과 산출 artifact SHA-256을 같은 원자적 build record에 넣는다. harness는 manifest의 artifact digest가 실제 production bytes와 일치하는지 확인하고 forbidden component count 0을 요구한다. 이어 exact T19-A profile path/digest를 test artifact와 같은 launch environment에 공급해 production artifact가 이를 `not_supported`로 취급하고 `m0-*` schema를 하나도 emit하지 않는지 black-box probe한다. 둘 중 하나라도 실패하면 T19-C 실패다. source-code 문자열 검색만으로 부재를 주장하지 않는다.
+
+현재 harness의 bound build record는 canonical JSON과 마지막 LF인 `secure-onboard-bound-build-manifest/v1`이다. 필드는 정확히 `schema_version`, 실제 production file bytes의 `artifact_sha256`, 같은 artifact의 `components` probe stdout bytes를 결속한 `component_manifest_sha256`, probe에서 읽은 정렬 `components`다. `build_manifest_digest`는 이 LF를 포함한 record bytes의 SHA-256이다. constructor는 실제 artifact를 다시 읽어 hash를 비교하고, exact component probe와 `{"profile":"not_supported"}\n` profile probe를 함께 검증한다.
+
+### 3.3 `M0FixtureManifest v1`
+
+클라이언트·버전·OS별 M0 정적 fixture와 실행 artifact는 다음 strict schema로 결속한다. 아래 JSON은 필드 모양을 보여 주기 위해 펼친 표현이며, 체크인하는 실제 manifest bytes는 object key를 UTF-8 byte 순서로 재귀 정렬한 공백 없는 JSON 한 개와 마지막 LF 하나여야 한다.
+
+```json
+{
+  "schema_version": "m0-fixture-manifest/v1",
+  "client": "codex",
+  "client_version": "0.146.0",
+  "os": "macos",
+  "architecture": "arm64",
+  "client_executable": {
+    "invoked_path": "/absolute/path/to/codex",
+    "resolved_path": "/absolute/path/to/codex-resolved",
+    "sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "version_output": "codex-cli 0.146.0"
+  },
+  "client_runtime_artifact": {
+    "role": "native_backend",
+    "absolute_path": "/absolute/path/to/codex-native-backend",
+    "sha256": "sha256:9191919191919191919191919191919191919191919191919191919191919191"
+  },
+  "plugin_manifest": {
+    "absolute_path": "/absolute/repository/root/plugins/codex-m0/.codex-plugin/plugin.json",
+    "sha256": "sha256:9292929292929292929292929292929292929292929292929292929292929292"
+  },
+  "shipped_hooks_definition": {
+    "absolute_path": "/absolute/repository/root/plugins/codex-m0/hooks/hooks.json",
+    "sha256": "sha256:9393939393939393939393939393939393939393939393939393939393939393"
+  },
+  "product_artifact": {
+    "absolute_path": "/absolute/path/to/secure-onboard-m0-hook",
+    "sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "compiled_test_profile_sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "core_artifact": {
+    "absolute_path": "/absolute/path/to/secure-onboard-m0-core",
+    "sha256": "sha256:9494949494949494949494949494949494949494949494949494949494949494"
+  },
+  "test_profile": {
+    "relative_path": "profiles/codex-0.146.0-macos-arm64.json",
+    "content_sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "helper_fixtures": [
+    {
+      "role": "default",
+      "relative_path": "helpers/m0-target.mjs",
+      "content_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "role": "failure",
+      "relative_path": "helpers/m0-target-fail.mjs",
+      "content_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "role": "near_match",
+      "relative_path": "helpers/m0-target-near-match.mjs",
+      "content_sha256": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ],
+  "native_fixtures": [
+    {
+      "role": "prompt",
+      "relative_path": "native/codex-prompt.json",
+      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "canonical_json_sha256": "sha256:2111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "role": "pre_tool_use",
+      "relative_path": "native/codex-pre.json",
+      "content_sha256": "sha256:3111111111111111111111111111111111111111111111111111111111111111",
+      "canonical_json_sha256": "sha256:4111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "role": "result_success",
+      "relative_path": "native/codex-result-success.json",
+      "content_sha256": "sha256:5111111111111111111111111111111111111111111111111111111111111111",
+      "canonical_json_sha256": "sha256:6111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "role": "result_failure",
+      "relative_path": "native/codex-result-failure.json",
+      "content_sha256": "sha256:7111111111111111111111111111111111111111111111111111111111111111",
+      "canonical_json_sha256": "sha256:8111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "role": "stop",
+      "relative_path": "native/codex-stop.json",
+      "content_sha256": "sha256:9111111111111111111111111111111111111111111111111111111111111111",
+      "canonical_json_sha256": "sha256:a111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ]
+}
+```
+
+모든 object는 표시한 key를 정확히 한 번씩 가지며 unknown·missing·duplicate key를 거부한다. `client=claude|codex`, `os=macos|windows`, `architecture=arm64|x86_64`만 허용하고 빈 값이나 제어문자가 든 `client_version`을 거부한다. `version_output`은 Claude에서 exact `<client_version> (Claude Code)`, Codex에서 exact `codex-cli <client_version>`이다. `invoked_path`는 실제 호출 경로이고 symlink일 수 있지만 이를 해소한 physical regular file이 `resolved_path`와 같아야 하며 `sha256`은 그 resolved file bytes의 digest다. `client_runtime_artifact`는 launcher와 별도로 실제 실행되는 runtime bytes를 결속한다. Claude는 `role=resolved_executable`이며 `client_executable.resolved_path|sha256`과 같아야 한다. Codex는 `role=native_backend`이며 platform package의 native backend absolute physical path·SHA-256을 기록한다. 따라서 버전 변경 뒤 JS launcher bytes가 같아도 stale manifest를 재사용할 수 없다.
+
+`plugin_manifest`와 `shipped_hooks_definition`은 같은 physical plugin root 아래의 non-symlink regular file이다. Claude는 각각 `plugins/claude-m0/.claude-plugin/plugin.json`, `plugins/claude-m0/hooks/hooks.json` suffix를, Codex는 각각 `plugins/codex-m0/.codex-plugin/plugin.json`, `plugins/codex-m0/hooks/hooks.json` suffix를 가져야 한다. Codex manifest가 가리키는 hooks 정의와 실제로 검증한 shipped hooks bytes를 분리해 추정하지 않는다. 각 `sha256`은 해당 raw file bytes를 결속하며 파일별 상한은 1MiB다.
+
+`product_artifact.absolute_path`와 `core_artifact.absolute_path`는 각각 platform executable suffix를 반영한 `secure-onboard-m0-hook`, `secure-onboard-m0-core` 이름의 physical non-symlink regular file이며 같은 physical directory의 sibling이다. 각 `sha256`은 exact artifact bytes를 결속하고 파일별 상한은 64MiB다. `product_artifact.compiled_test_profile_sha256`은 `test_profile.content_sha256`과 같아야 하므로 실행 artifact가 compile-time에 결속한 profile과 검사한 profile이 달라질 수 없다. profile의 `client|client_version|os|architecture`는 manifest와 같고 profile 안 `default|failure` helper digest는 같은 role의 `helper_fixtures` digest와 같아야 한다.
+
+`helper_fixtures`는 `default`, `failure`, `near_match` 순서로 정확히 세 개다. `native_fixtures`는 `prompt`, `pre_tool_use`, `result_success`, `result_failure`, `stop` 순서로 정확히 다섯 개다. 모든 `relative_path`는 harness가 제공한 physical fixture root 아래의 non-symlink regular file을 가리키며 absolute path, `.`, `..`를 허용하지 않는다. profile 상한은 64KiB이고 helper/native fixture 상한은 파일별 1MiB다. `content_sha256`은 마지막 LF를 포함한 raw file bytes에 적용한다. native JSON은 duplicate key와 trailing non-whitespace를 거부하고 `canonical_json_sha256`은 strict decode 뒤 재귀 key 정렬·공백 없음·추가 LF 없음인 canonical JSON bytes에 적용한다. 모든 digest는 `sha256:` 뒤 lowercase hex 64자리다. target project 밖의 profile source 신뢰와 runtime/helper argv 결속은 이 manifest 검증 뒤 §3.0 loader가 별도로 다시 검증한다.
+
+macOS arm64 fixture manifest 생성기는 invoked symlink를 먼저 physical executable로 해소한 뒤 그 resolved path를 직접 `--version`으로 실행한다. 실행 전후 resolved file을 각각 `O_NOFOLLOW` FD로 bounded streaming hash하고 identity·metadata가 같은지 확인하며 invoked path도 다시 해소해 동일 target인지 확인한다. client executable/native backend 상한은 파일별 512MiB다. 전후 snapshot에 남은 leaf file 또는 invoked symlink 변경은 생성 실패다. 다만 subprocess가 실제 image를 여는 순간을 retained FD와 kernel-atomic하게 결속하지 않으므로, 두 snapshot 사이의 교체·복원이나 parent directory graph의 원자적 무변경까지 증명하지는 않는다.
 
 ## 4. 어댑터 입력 계약
 

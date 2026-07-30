@@ -1,8 +1,8 @@
 # 문서 검토 및 구현 준비도
 
-- 최신 검토일: 2026-07-26
+- 최신 검토일: 2026-07-29
 - 기준 문서: 루트 `README.md`, `CONTEXT.md`, `docs/plan/*.md`
-- 판정: **M0 hook tracer-bullet GO / 전체 M1 NO-GO**
+- 판정: **M0 구현·관찰 완료-with-exclusions / 검증된 보호 coverage 0 / 전체 M1 NO-GO**
 
 ## 최신 검토 결론
 
@@ -22,6 +22,24 @@
 | 중복 검사 | evidence/action cache 분리, remote npm은 HIGH deny·cache bypass |
 | 데이터 | 외부 프로젝트 AI 처리는 허용; 공급자 데이터 정책은 각 CLI를 따름 |
 | M1 성격 | 일반 탐지 제품이 아니라 npm 설치·파일 열기·명시적 read-only scan을 고정 fixture로 관통하는 end-to-end alpha |
+
+## M0 실측 증거와 M1 재판정
+
+2026-07-29 macOS 26.5.2(build 25F84) arm64에서 로컬 mock API와 외부 egress trap만 사용해 native probe를 실행했다. 실행 파일, test profile, helper, native fixture, plugin/hook definition과 M0 hook/core release artifact의 결합은 `tests/fixtures/m0/manifests/`의 canonical manifest 두 개로 고정한다. 관찰 행렬은 46 case × 2 client를 분류하지만 현재 `verified=0`, coverage `included=0`이다.
+
+| client | exact 실행 파일 | 실측 결과 | M0 coverage |
+|--------|-----------------|-----------|-------------|
+| Claude Code 2.1.220 | `/Users/kimchanhyung98/.local/share/claude/versions/2.1.220`, `sha256:8addc857f3fe64d5a0368af9ee50321b50afb4a6918ba3ef018ab84f5dbbe081` | HIGH marker 부재, LOW warning stream 수신 뒤 marker 생성, INFO marker 생성, success/failure result correlation과 Stop exact message를 관찰했다. core timeout/nonzero/schema failure는 adapter가 HIGH deny로 변환했다. `/bin/ps`가 권한 오류여서 target process start는 모두 null이다. | 실제 marker·native payload 관찰은 보존하지만 process·승인 경계가 미검증이므로 모든 protection coverage 제외 |
+| Codex CLI 0.146.0 | `/opt/homebrew/lib/node_modules/@openai/codex/bin/codex.js`, `sha256:134063e133f0b4244fa3b251acf973d4fe4b4aeeacbdc135211bf480f59f1477` | hook은 호출되지만 per-call `workdir`를 native payload에서 신뢰할 수 없어 HIGH sentinel을 활성화하지 않았다. success와 exit 23 failure의 `PostToolUse.tool_response`가 모두 exact empty string이라 outcome을 구분할 수 없었다. `systemMessage` 전달도 관찰되지 않았다. | 이 exact version의 shell action/result path 전체 제외 |
+
+- Claude·Codex adapter 자체 미실행, timeout, 일반 nonzero, malformed output에서는 target marker가 생성돼 native fail-open 경계를 관찰했다. exit 2 fault의 marker는 없었지만 process observer와 실제 승인 경계가 없으므로 이를 보호 성공으로 세지 않는다.
+- plugin/hooks OFF control은 격리된 임시 cwd에서 target 실행과 제품 event 0을 확인했다. 저장소 자체 hook이 섞이지 않도록 control cwd를 별도로 검증한다.
+- 같은 Claude `PreToolUse`의 sibling hook은 원래 HIGH target 차단 뒤에도 marker를 기록했다. sibling 부작용 0은 보장하지 않는다.
+- kernel network confinement는 `sandbox-exec` 권한 오류로 사용할 수 없었다. localhost mock API 외 요청은 proxy trap으로 관찰했고 격리 수정 뒤 egress 시도 0이었다.
+- interactive operator approval은 실행하지 않았다. bypass mode의 target reachability만 관찰했으며 native approval 안전성 성공으로 표시하지 않는다.
+- Codex 자동 continuation probe에서는 최초 인간 prompt의 `UserPromptSubmit` 1개와 같은 turn의 Stop 2개(`stop_hook_active=false → true`)를 관찰했다. continuation은 두 번째 local API 요청의 `<hook_prompt>`였고 두 번째 `UserPromptSubmit`은 없었으므로 provenance는 계속 `unverified`다.
+- `codex exec --json`에서 `systemMessage`가 보이지 않은 사실만 확인했다. 대화형 terminal UI 렌더링은 실행하지 않아 T20 사용자 표시 계약은 미검증이다.
+- Codex의 effective cwd와 result outcome이 정본 가정과 달랐으므로 D12에 따라 M1 착수 조건은 닫히지 않았다. M1 구현 범위를 추측해 진행하지 않고 전체 M1 판정을 `NO-GO`로 유지한다.
 
 ## 제거한 오류·모순
 
@@ -60,7 +78,7 @@
 
 다음은 구현 중 정하면 되는 사소한 세부가 아니라 M1 expected output 또는 지원 범위를 바꾸므로 먼저 닫아야 한다.
 
-1. Claude Code·Codex의 지원 exact version·OS별 native prompt/pre/result/Stop bytes, deny·continue 응답과 HIGH 뒤 target process start 0 증거
+1. Claude Code·Codex의 지원 exact version·OS별 native prompt/pre/result/Stop bytes, deny·continue 응답과 관찰 가능한 독립 process observer로 확인한 HIGH 뒤 target process start 0 증거
 2. core child 실패를 valid deny로 변환하는 경우와 adapter 자체 미실행·timeout·malformed output의 native fail-open 가능성을 분리한 fixture
 3. client-native plugin/hooks OFF, Codex hook-definition trust, Claude workspace/plugin/bare 상태의 확인 가능 범위
 4. 공식 provenance 필드가 없는 Codex에서 제품 소유 local confirmation을 action에 결합하는 exact transport fixture
@@ -71,28 +89,17 @@
 9. exact local npm artifact와 실제 실행 bytes 결합, Node/npm version·effective config fixture
 10. stale/cross-session/wrong-ref, near-miss identity, digest mismatch, replay·병렬 HIGH의 negative fixture
 
-## 다음 구현 작업
+## 다음 작업
 
-**진행 가능:** 고정 HIGH/LOW/INFO sentinel을 사용하는 M0 hook tracer-bullet.
+M0 test-only tracer, strict profile/manifest, adapter/core, native harness, status·observation contract와 production 음성 검사는 구현돼 있다. 다음 지원 확대 작업은 새 기능을 추측해 만드는 것이 아니라 현재 제외된 경계를 실제 증거로 닫는 일이다.
 
-M0는 다음을 산출해야 한다.
+- 독립 process observer가 가능한 환경에서 Claude HIGH와 fault exit 2의 target process start를 다시 측정
+- 두 CLI의 실제 대화형 승인 절차를 사람이 수행해 LOW·INFO와 adapter fault가 native approval을 우회하지 않는지 확인
+- 실제 대화형 terminal에서 `systemMessage` 표시·시각·개행·잘림을 측정
+- Codex에서 effective per-call cwd와 success/failure result outcome을 신뢰할 공식·관찰 가능 필드가 생긴 exact version만 새 matrix entry로 추가
+- 위 증거가 없는 동안 coverage는 0으로 유지하고 설치 가능 제품·M1 보호로 설명하지 않음
 
-- Claude·Codex plugin manifest와 native hook payload fixture
-- `HookEnvelope → M0ActionRequest → M0ActionDecision` 최소 변환과 production LocalEvent/Status와 분리된 M0Event/M0StatusReport
-- documented HIGH deny, LOW/INFO continue와 native approval 유지 증거
-- parallel native tool call/result correlation
-- live adapter의 core child timeout·exit·schema failure deny와 adapter 자체 fault의 native 결과를 분리한 증거
-- plugin/hooks OFF와 client별 standalone status/self-test
-- 공식 Stop `last_assistant_message`의 nullable 조건·exact bytes·marker/digest fidelity
-- Codex native `Bash/command/tool_use_id`와 내부 canonical field의 변환 fixture
-- Codex exact bundled hook definition bytes·제품 자체 digest·새 session trust 행동·heartbeat. 내부 trust hash 값은 추정하지 않음
-- effective shell과 effective cwd 결합, per-call workdir을 식별하지 못하는 native path 전체의 coverage 제외
-- sandbox mode·approval policy·approvals reviewer를 포함한 native control run
-- M0 test build에 compile-time으로 결합된 exact profile bytes/digest와 production artifact의 loader·sentinel rule 부재, Codex unsupported output exact bytes 결과
-
-2026-07-26 현재 이 장비의 첫 probe 후보는 `codex-cli 0.145.0`, `Claude Code 2.1.220`이다. 이는 설치된 버전 기록일 뿐 최소 지원 버전 선언이 아니며, M0 결과와 함께 실행 파일 hash·OS·shell·permission mode까지 묶어야 한다.
-
-M0에서는 npm/EICAR 분석기, 캐시, 재확인 UI, AI 판정 bridge를 구현하지 않는다. M0 증거와 남은 M1 구조 계약이 닫히면 `use-cases.md`의 manifest를 작성하고 M1 alpha GO/NO-GO를 다시 판정한다.
+M0에서는 npm/EICAR 분석기, 캐시, 재확인 UI, SQLite와 AI 판정 bridge를 구현하지 않는다. M1은 이 문서의 blocker와 exact fixture 계약을 닫고 별도 GO 판정을 갱신하기 전까지 시작하지 않는다.
 
 ## 확정한 제품 정책
 

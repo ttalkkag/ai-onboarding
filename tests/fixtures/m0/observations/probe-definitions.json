@@ -1,0 +1,40 @@
+{
+  "schema_version": "m0-probe-definitions/v1",
+  "definitions": {
+    "claude_sibling_hook": {
+      "client": "claude",
+      "case_ids": [
+        "T09"
+      ],
+      "required_observations": [
+        "target_process_started",
+        "native_approval",
+        "sibling_effect_separated_from_target"
+      ]
+    },
+    "claude_system_message_display": {
+      "client": "claude",
+      "case_ids": [
+        "T20-A",
+        "T20-B",
+        "T20-C"
+      ],
+      "required_observations": [
+        "interactive_rendered_bytes",
+        "render_timestamp_before_target",
+        "truncation_and_newline_handling"
+      ]
+    },
+    "codex_project_hook_spoof": {
+      "client": "codex",
+      "case_ids": [
+        "T17"
+      ],
+      "required_observations": [
+        "trusted_user_hook_source",
+        "project_hook_exclusion",
+        "heartbeat_source_binding"
+      ]
+    }
+  }
+}

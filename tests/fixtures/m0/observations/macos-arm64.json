@@ -1,0 +1,1170 @@
+{
+  "schema_version": "m0-observation-matrix/v1",
+  "assessed_at": "2026-07-29",
+  "host": {
+    "os": "macos",
+    "os_version": "26.5.2",
+    "os_build": "25F84",
+    "architecture": "arm64",
+    "process_observer": "unavailable_operation_not_permitted",
+    "approval_boundary": "unverified_noninteractive_bypass_mode_no_operator_approval"
+  },
+  "m0_gate": "OBSERVATION_COMPLETE_WITH_EXCLUSIONS",
+  "m1_gate": "NO_GO",
+  "clients": {
+    "claude": {
+      "client": "claude",
+      "client_version": "2.1.220",
+      "manifest_evidence_id": "manifest-claude"
+    },
+    "codex": {
+      "client": "codex",
+      "client_version": "0.146.0",
+      "manifest_evidence_id": "manifest-codex"
+    }
+  },
+  "evidence_catalog": [
+    {
+      "evidence_id": "contract-adapter-core-fallback",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_adapter_integration.rs",
+      "content_sha256": "sha256:7f9da9724fe63da2a98ff3533e71df0b8c58153dde500c93e7b81d76bc48f160",
+      "selector": "observed_core_failures_become_high_but_core_spawn_failure_does_not"
+    },
+    {
+      "evidence_id": "contract-adapter-near-match",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_adapter_integration.rs",
+      "content_sha256": "sha256:7f9da9724fe63da2a98ff3533e71df0b8c58153dde500c93e7b81d76bc48f160",
+      "selector": "helper_or_argv_near_match_is_neutral_and_never_reaches_core"
+    },
+    {
+      "evidence_id": "contract-adapter-parallel",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_adapter_integration.rs",
+      "content_sha256": "sha256:7f9da9724fe63da2a98ff3533e71df0b8c58153dde500c93e7b81d76bc48f160",
+      "selector": "parallel_pre_calls_keep_out_of_order_results_on_their_native_tool_ids"
+    },
+    {
+      "evidence_id": "contract-core-high",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_core_contract.rs",
+      "content_sha256": "sha256:9d2146fdbc221ccdf90d2d4d9dcb55a633b9aa85475d42a115561dd16c5bf1c4",
+      "selector": "high_sentinel_denies_and_emits_the_only_valid_event_sequence"
+    },
+    {
+      "evidence_id": "contract-core-low-info",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_core_contract.rs",
+      "content_sha256": "sha256:9d2146fdbc221ccdf90d2d4d9dcb55a633b9aa85475d42a115561dd16c5bf1c4",
+      "selector": "low_and_info_continue_without_inventing_a_result_event"
+    },
+    {
+      "evidence_id": "contract-native-claude-lifecycle",
+      "kind": "contract_test",
+      "relative_path": "tests/native_adapter_contract.rs",
+      "content_sha256": "sha256:4e0d3792235d41415e5278217fef7f03a16a10256cd75880b59c4552f0c727f8",
+      "selector": "claude_exact_native_lifecycle_maps_to_tagged_envelopes"
+    },
+    {
+      "evidence_id": "contract-native-codex-result",
+      "kind": "contract_test",
+      "relative_path": "tests/native_adapter_contract.rs",
+      "content_sha256": "sha256:4e0d3792235d41415e5278217fef7f03a16a10256cd75880b59c4552f0c727f8",
+      "selector": "codex_ambiguous_results_are_rejected_instead_of_inventing_success"
+    },
+    {
+      "evidence_id": "contract-native-responses",
+      "kind": "contract_test",
+      "relative_path": "tests/native_adapter_contract.rs",
+      "content_sha256": "sha256:4e0d3792235d41415e5278217fef7f03a16a10256cd75880b59c4552f0c727f8",
+      "selector": "native_responses_never_auto_approve_and_have_exact_bytes"
+    },
+    {
+      "evidence_id": "contract-production-profile",
+      "kind": "contract_test",
+      "relative_path": "tests/production_artifact_contract.rs",
+      "content_sha256": "sha256:eadc78621e709501c50f696bcde88c9aa2396258668d4423c64f78bab21e52ad",
+      "selector": "clean_no_feature_release_artifact_rejects_m0_profiles_and_contains_no_m0_payload"
+    },
+    {
+      "evidence_id": "contract-profile-argv",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_profile_contract.rs",
+      "content_sha256": "sha256:ca833a069c52aa8cbf1d07cf37968c88bc4d7fb908c0be8aa8b379bad5d30665",
+      "selector": "any_non_exact_posix_ascii_argv4_input_disables_the_sentinel"
+    },
+    {
+      "evidence_id": "contract-profile-digest",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_profile_contract.rs",
+      "content_sha256": "sha256:ca833a069c52aa8cbf1d07cf37968c88bc4d7fb908c0be8aa8b379bad5d30665",
+      "selector": "one_changed_profile_byte_is_rejected_by_the_compile_time_digest"
+    },
+    {
+      "evidence_id": "contract-profile-helper",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_profile_contract.rs",
+      "content_sha256": "sha256:ca833a069c52aa8cbf1d07cf37968c88bc4d7fb908c0be8aa8b379bad5d30665",
+      "selector": "helper_bytes_changed_after_profile_load_disable_the_sentinel"
+    },
+    {
+      "evidence_id": "contract-profile-missing",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_profile_contract.rs",
+      "content_sha256": "sha256:ca833a069c52aa8cbf1d07cf37968c88bc4d7fb908c0be8aa8b379bad5d30665",
+      "selector": "missing_profile_is_rejected_before_any_sentinel_can_load"
+    },
+    {
+      "evidence_id": "contract-profile-source",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_profile_contract.rs",
+      "content_sha256": "sha256:ca833a069c52aa8cbf1d07cf37968c88bc4d7fb908c0be8aa8b379bad5d30665",
+      "selector": "digest_matched_profile_inside_the_target_project_is_still_untrusted"
+    },
+    {
+      "evidence_id": "contract-profile-valid",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_profile_contract.rs",
+      "content_sha256": "sha256:ca833a069c52aa8cbf1d07cf37968c88bc4d7fb908c0be8aa8b379bad5d30665",
+      "selector": "exact_trusted_profile_and_argv_activate_the_declared_sentinel"
+    },
+    {
+      "evidence_id": "contract-runtime-fallback",
+      "kind": "contract_test",
+      "relative_path": "tests/adapter_runtime_contract.rs",
+      "content_sha256": "sha256:a76a1b731f01a7850d5b0a70bd19148f955e9b2fc0dbe1d2245aaa914998e6ac",
+      "selector": "only_timeout_nonzero_and_schema_invalid_have_m0_fallback_codes"
+    },
+    {
+      "evidence_id": "contract-status-claude-disabled",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_status_contract.rs",
+      "content_sha256": "sha256:ffc41e4359b6551a7f676f6fd2e5063693c5f7d1423432b4d4ca2d4ec620367a",
+      "selector": "claude_disable_all_hooks_preserves_installed_plugin_status"
+    },
+    {
+      "evidence_id": "contract-status-claude-launch",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_status_contract.rs",
+      "content_sha256": "sha256:ffc41e4359b6551a7f676f6fd2e5063693c5f7d1423432b4d4ca2d4ec620367a",
+      "selector": "claude_disabled_launch_modes_are_off_with_exact_mode_evidence"
+    },
+    {
+      "evidence_id": "contract-status-not-installed",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_status_contract.rs",
+      "content_sha256": "sha256:ffc41e4359b6551a7f676f6fd2e5063693c5f7d1423432b4d4ca2d4ec620367a",
+      "selector": "not_installed_is_off_and_cannot_be_reported_active"
+    },
+    {
+      "evidence_id": "contract-status-strict",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_status_contract.rs",
+      "content_sha256": "sha256:ffc41e4359b6551a7f676f6fd2e5063693c5f7d1423432b4d4ca2d4ec620367a",
+      "selector": "strict_status_shape_rejects_unknown_fields_and_missing_nullable_fields"
+    },
+    {
+      "evidence_id": "contract-status-t12",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_status_contract.rs",
+      "content_sha256": "sha256:ffc41e4359b6551a7f676f6fd2e5063693c5f7d1423432b4d4ca2d4ec620367a",
+      "selector": "unknown_protection_needs_a_finite_next_check_and_cross_client_sources_fail"
+    },
+    {
+      "evidence_id": "contract-status-t13",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_status_contract.rs",
+      "content_sha256": "sha256:ffc41e4359b6551a7f676f6fd2e5063693c5f7d1423432b4d4ca2d4ec620367a",
+      "selector": "t13_unreviewed_definition_is_unknown_until_reviewed"
+    },
+    {
+      "evidence_id": "contract-status-t14",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_status_contract.rs",
+      "content_sha256": "sha256:ffc41e4359b6551a7f676f6fd2e5063693c5f7d1423432b4d4ca2d4ec620367a",
+      "selector": "t14_existing_session_is_bound_before_a_new_session_can_be_trusted"
+    },
+    {
+      "evidence_id": "contract-status-t15",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_status_contract.rs",
+      "content_sha256": "sha256:ffc41e4359b6551a7f676f6fd2e5063693c5f7d1423432b4d4ca2d4ec620367a",
+      "selector": "t15_requires_current_session_hook_heartbeat_and_exact_mode_digest"
+    },
+    {
+      "evidence_id": "contract-status-t16",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_status_contract.rs",
+      "content_sha256": "sha256:ffc41e4359b6551a7f676f6fd2e5063693c5f7d1423432b4d4ca2d4ec620367a",
+      "selector": "t16_stale_checks_remain_bound_to_the_pre_change_reviewed_digest"
+    },
+    {
+      "evidence_id": "contract-status-t19",
+      "kind": "contract_test",
+      "relative_path": "tests/m0_status_contract.rs",
+      "content_sha256": "sha256:ffc41e4359b6551a7f676f6fd2e5063693c5f7d1423432b4d4ca2d4ec620367a",
+      "selector": "t19_test_artifact_profile_oracles_validate"
+    },
+    {
+      "evidence_id": "manifest-claude",
+      "kind": "static_manifest",
+      "relative_path": "tests/fixtures/m0/manifests/claude-2.1.220-macos-arm64.json",
+      "content_sha256": "sha256:fd5730989abb31001b5248286c59f1f0998fda4ee59f674915fd859e53b56e01",
+      "selector": null
+    },
+    {
+      "evidence_id": "manifest-codex",
+      "kind": "static_manifest",
+      "relative_path": "tests/fixtures/m0/manifests/codex-0.146.0-macos-arm64.json",
+      "content_sha256": "sha256:69e8ed829cea907dc259f5296a807ad4fc16d54d74f728dd0dcdc069ecf57560",
+      "selector": null
+    },
+    {
+      "evidence_id": "native-claude-stop",
+      "kind": "native_fixture",
+      "relative_path": "tests/fixtures/m0/native/claude-2.1.220-macos-arm64-stop.json",
+      "content_sha256": "sha256:cf2b8a07c45cca5cc1876537513413dabc997e88b6c03812b1959bb49cd64706",
+      "selector": null
+    },
+    {
+      "evidence_id": "native-codex-stop",
+      "kind": "native_fixture",
+      "relative_path": "tests/fixtures/m0/native/codex-0.146.0-macos-arm64-stop.json",
+      "content_sha256": "sha256:0b86a06b3f430fbd7e50b9f3c4e9a1fee6153339532968627b64d5dcbcb0621c",
+      "selector": null
+    },
+    {
+      "evidence_id": "observation-claude-faults",
+      "kind": "observation_result",
+      "relative_path": "tests/fixtures/m0/observations/native-macos-arm64.json",
+      "content_sha256": "sha256:b3cdea9aa364b181fe4e20f211da91fa7244ab6c1a3f1941600d4cd1ff9a48e4",
+      "selector": "/claims/claude_adapter_faults"
+    },
+    {
+      "evidence_id": "observation-codex-cwd",
+      "kind": "observation_result",
+      "relative_path": "tests/fixtures/m0/observations/native-macos-arm64.json",
+      "content_sha256": "sha256:b3cdea9aa364b181fe4e20f211da91fa7244ab6c1a3f1941600d4cd1ff9a48e4",
+      "selector": "/claims/codex_effective_cwd_unavailable"
+    },
+    {
+      "evidence_id": "observation-codex-faults",
+      "kind": "observation_result",
+      "relative_path": "tests/fixtures/m0/observations/native-macos-arm64.json",
+      "content_sha256": "sha256:b3cdea9aa364b181fe4e20f211da91fa7244ab6c1a3f1941600d4cd1ff9a48e4",
+      "selector": "/claims/codex_adapter_faults"
+    },
+    {
+      "evidence_id": "observation-codex-prompt",
+      "kind": "observation_result",
+      "relative_path": "tests/fixtures/m0/observations/native-macos-arm64.json",
+      "content_sha256": "sha256:b3cdea9aa364b181fe4e20f211da91fa7244ab6c1a3f1941600d4cd1ff9a48e4",
+      "selector": "/claims/codex_prompt_continuation"
+    },
+    {
+      "evidence_id": "observation-codex-result",
+      "kind": "observation_result",
+      "relative_path": "tests/fixtures/m0/observations/native-macos-arm64.json",
+      "content_sha256": "sha256:b3cdea9aa364b181fe4e20f211da91fa7244ab6c1a3f1941600d4cd1ff9a48e4",
+      "selector": "/claims/codex_result_ambiguous"
+    },
+    {
+      "evidence_id": "observation-codex-t20",
+      "kind": "observation_result",
+      "relative_path": "tests/fixtures/m0/observations/native-macos-arm64.json",
+      "content_sha256": "sha256:b3cdea9aa364b181fe4e20f211da91fa7244ab6c1a3f1941600d4cd1ff9a48e4",
+      "selector": "/claims/codex_system_message_display"
+    },
+    {
+      "evidence_id": "probe-claude-sibling",
+      "kind": "probe_definition",
+      "relative_path": "tests/fixtures/m0/observations/probe-definitions.json",
+      "content_sha256": "sha256:97218b28ee954ef40d3a8df31daffbe281d27a109e7e143445baa67f5f84accc",
+      "selector": "/definitions/claude_sibling_hook"
+    },
+    {
+      "evidence_id": "probe-claude-t20",
+      "kind": "probe_definition",
+      "relative_path": "tests/fixtures/m0/observations/probe-definitions.json",
+      "content_sha256": "sha256:97218b28ee954ef40d3a8df31daffbe281d27a109e7e143445baa67f5f84accc",
+      "selector": "/definitions/claude_system_message_display"
+    },
+    {
+      "evidence_id": "probe-codex-spoof",
+      "kind": "probe_definition",
+      "relative_path": "tests/fixtures/m0/observations/probe-definitions.json",
+      "content_sha256": "sha256:97218b28ee954ef40d3a8df31daffbe281d27a109e7e143445baa67f5f84accc",
+      "selector": "/definitions/codex_project_hook_spoof"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "T01",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Deterministic core and response contracts pass, but native target process observation and operator approval were unavailable.",
+        "evidence_ids": [
+          "contract-core-high",
+          "contract-native-responses"
+        ]
+      },
+      "codex": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T01 is the Claude-specific HIGH case.",
+        "evidence_ids": []
+      }
+    },
+    {
+      "case_id": "T02",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T02 is the Codex-specific HIGH case.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 did not expose effective per-call workdir, so the shell ingress is excluded.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T03",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The LOW decision contract is deterministic; operator approval and process timing remain unverified.",
+        "evidence_ids": [
+          "contract-core-low-info"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 did not expose effective per-call workdir, so the shell ingress is excluded.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T04",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The INFO decision contract is deterministic; operator approval and process timing remain unverified.",
+        "evidence_ids": [
+          "contract-core-low-info"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 did not expose effective per-call workdir, so the shell ingress is excluded.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-A",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The core timeout fallback is covered by deterministic contracts, not a verified native protection run.",
+        "evidence_ids": [
+          "contract-adapter-core-fallback",
+          "contract-runtime-fallback"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 shell ingress lacks effective per-call workdir evidence.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-B",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The core nonzero fallback is covered by deterministic contracts, not a verified native protection run.",
+        "evidence_ids": [
+          "contract-adapter-core-fallback",
+          "contract-runtime-fallback"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 shell ingress lacks effective per-call workdir evidence.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-C",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The core schema fallback is covered by deterministic contracts, not a verified native protection run.",
+        "evidence_ids": [
+          "contract-adapter-core-fallback",
+          "contract-runtime-fallback"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 shell ingress lacks effective per-call workdir evidence.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-D",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-claude-faults"
+        ]
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-codex-faults"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-E",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-claude-faults"
+        ]
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-codex-faults"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-F",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-claude-faults"
+        ]
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-codex-faults"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-G",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-claude-faults"
+        ]
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-codex-faults"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-H-Codex",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T05-H-Codex probes a Codex-only unsupported decision.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-codex-faults"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-I",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-claude-faults"
+        ]
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The target marker existed, while target process start and operator approval remained unverified.",
+        "evidence_ids": [
+          "observation-codex-faults"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-J",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "Marker absence is not process-start proof; the process observer and operator approval were unavailable.",
+        "evidence_ids": [
+          "observation-claude-faults"
+        ]
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "Marker absence is not process-start proof; the process observer and operator approval were unavailable.",
+        "evidence_ids": [
+          "observation-codex-faults"
+        ]
+      }
+    },
+    {
+      "case_id": "T05-K",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "Marker absence is not process-start proof; the process observer and operator approval were unavailable.",
+        "evidence_ids": [
+          "observation-claude-faults"
+        ]
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "Marker absence is not process-start proof; the process observer and operator approval were unavailable.",
+        "evidence_ids": [
+          "observation-codex-faults"
+        ]
+      }
+    },
+    {
+      "case_id": "T06-A",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The not-installed OFF projection is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-not-installed"
+        ]
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The not-installed OFF projection is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-not-installed"
+        ]
+      }
+    },
+    {
+      "case_id": "T06-B",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T06-B is the Codex hook-feature-disabled case.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The strict status shape is implemented, but this native mode was not independently observed.",
+        "evidence_ids": [
+          "contract-status-strict"
+        ]
+      }
+    },
+    {
+      "case_id": "T06-C",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The disableAllHooks OFF projection is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-claude-disabled"
+        ]
+      },
+      "codex": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T06-C is a Claude-specific disableAllHooks case.",
+        "evidence_ids": []
+      }
+    },
+    {
+      "case_id": "T06-D",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The bare-mode OFF projection is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-claude-launch"
+        ]
+      },
+      "codex": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T06-D is a Claude-specific launch-mode case.",
+        "evidence_ids": []
+      }
+    },
+    {
+      "case_id": "T06-E",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The simple-mode OFF projection is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-claude-launch"
+        ]
+      },
+      "codex": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T06-E is a Claude-specific launch-mode case.",
+        "evidence_ids": []
+      }
+    },
+    {
+      "case_id": "T07",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Parallel action correlation is covered by a deterministic integration contract only.",
+        "evidence_ids": [
+          "contract-adapter-parallel"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 shell ingress lacks effective per-call workdir evidence.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T08",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The checked Stop fixture and mapper contract do not establish native protection coverage.",
+        "evidence_ids": [
+          "contract-native-claude-lifecycle",
+          "native-claude-stop"
+        ]
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "The checked Stop fixture and mapper contract do not establish native protection coverage.",
+        "evidence_ids": [
+          "contract-native-codex-result",
+          "native-codex-stop"
+        ]
+      }
+    },
+    {
+      "case_id": "T09",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The probe remains defined, but target process and sibling-effect separation were not proven.",
+        "evidence_ids": [
+          "probe-claude-sibling"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 shell ingress lacks effective per-call workdir evidence.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T10-LOW",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Claude failure normalization is deterministic in the mapper contract, without verified native coverage.",
+        "evidence_ids": [
+          "contract-core-low-info",
+          "contract-native-claude-lifecycle"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 emitted the same empty result for success and failure; outcome is rejected as ambiguous.",
+        "evidence_ids": [
+          "observation-codex-result"
+        ]
+      }
+    },
+    {
+      "case_id": "T10-INFO",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Claude failure normalization is deterministic in the mapper contract, without verified native coverage.",
+        "evidence_ids": [
+          "contract-core-low-info",
+          "contract-native-claude-lifecycle"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 emitted the same empty result for success and failure; outcome is rejected as ambiguous.",
+        "evidence_ids": [
+          "observation-codex-result"
+        ]
+      }
+    },
+    {
+      "case_id": "T11",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T11 measures Codex continuation provenance.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "One prompt and two Stop events were observed; continuation used API hook_prompt and provenance remains unverified.",
+        "evidence_ids": [
+          "observation-codex-prompt"
+        ]
+      }
+    },
+    {
+      "case_id": "T12",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "UNKNOWN protection projection is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-t12"
+        ]
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "UNKNOWN protection projection is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-t12"
+        ]
+      }
+    },
+    {
+      "case_id": "T13",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T13 is a Codex hook-definition trust case.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Unreviewed definition projection is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-t13"
+        ]
+      }
+    },
+    {
+      "case_id": "T14",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T14 is a Codex session-trust case.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Existing-session projection is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-t14"
+        ]
+      }
+    },
+    {
+      "case_id": "T15",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T15 is a Codex session-trust case.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Current-session binding is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-t15"
+        ]
+      }
+    },
+    {
+      "case_id": "T16",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T16 is a Codex hook-definition trust case.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Stale-definition projection is covered only by a deterministic status contract.",
+        "evidence_ids": [
+          "contract-status-t16"
+        ]
+      }
+    },
+    {
+      "case_id": "T17",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T17 is a Codex project-local hook spoof case.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "The spoof-resistance probe is defined but has no checked native result.",
+        "evidence_ids": [
+          "probe-codex-spoof"
+        ]
+      }
+    },
+    {
+      "case_id": "T18",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T18 measures Codex unified-exec per-call workdir.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 did not expose effective per-call workdir in the native payload.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T19-A-HIGH",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Exact profile activation and status projection pass deterministic contracts only.",
+        "evidence_ids": [
+          "contract-profile-valid",
+          "contract-status-t19"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 shell ingress lacks effective per-call workdir evidence.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T19-A-LOW",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Exact profile activation and status projection pass deterministic contracts only.",
+        "evidence_ids": [
+          "contract-profile-valid",
+          "contract-status-t19"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 shell ingress lacks effective per-call workdir evidence.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T19-A-INFO",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Exact profile activation and status projection pass deterministic contracts only.",
+        "evidence_ids": [
+          "contract-profile-valid",
+          "contract-status-t19"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 shell ingress lacks effective per-call workdir evidence.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T19-B-MISSING",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Missing-profile rejection and status projection pass deterministic contracts only.",
+        "evidence_ids": [
+          "contract-profile-missing",
+          "contract-status-t19"
+        ]
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Missing-profile rejection and status projection pass deterministic contracts only.",
+        "evidence_ids": [
+          "contract-profile-missing",
+          "contract-status-t19"
+        ]
+      }
+    },
+    {
+      "case_id": "T19-B-DIGEST",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Profile digest rejection and status projection pass deterministic contracts only.",
+        "evidence_ids": [
+          "contract-profile-digest",
+          "contract-status-t19"
+        ]
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Profile digest rejection and status projection pass deterministic contracts only.",
+        "evidence_ids": [
+          "contract-profile-digest",
+          "contract-status-t19"
+        ]
+      }
+    },
+    {
+      "case_id": "T19-B-SOURCE",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Untrusted-profile-source rejection and status projection pass deterministic contracts only.",
+        "evidence_ids": [
+          "contract-profile-source",
+          "contract-status-t19"
+        ]
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Untrusted-profile-source rejection and status projection pass deterministic contracts only.",
+        "evidence_ids": [
+          "contract-profile-source",
+          "contract-status-t19"
+        ]
+      }
+    },
+    {
+      "case_id": "T19-B-HELPER",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Near-match helper rejection passes deterministic contracts; native approval remains unverified.",
+        "evidence_ids": [
+          "contract-adapter-near-match",
+          "contract-profile-helper",
+          "contract-status-t19"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 shell ingress lacks effective per-call workdir evidence.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T19-B-ARGV",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Near-match argv rejection passes deterministic contracts; native approval remains unverified.",
+        "evidence_ids": [
+          "contract-adapter-near-match",
+          "contract-profile-argv",
+          "contract-status-t19"
+        ]
+      },
+      "codex": {
+        "status": "observed_unsupported",
+        "coverage_effect": "excluded",
+        "reason": "Codex 0.146.0 shell ingress lacks effective per-call workdir evidence.",
+        "evidence_ids": [
+          "observation-codex-cwd"
+        ]
+      }
+    },
+    {
+      "case_id": "T19-C",
+      "claude": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Production profile exclusion passes deterministic artifact and status contracts only.",
+        "evidence_ids": [
+          "contract-production-profile",
+          "contract-status-t19"
+        ]
+      },
+      "codex": {
+        "status": "contract_only",
+        "coverage_effect": "excluded",
+        "reason": "Production profile exclusion passes deterministic artifact and status contracts only.",
+        "evidence_ids": [
+          "contract-production-profile",
+          "contract-status-t19"
+        ]
+      }
+    },
+    {
+      "case_id": "T20-A",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "Interactive rendered bytes and display placement have not been observed.",
+        "evidence_ids": [
+          "probe-claude-t20"
+        ]
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "systemMessage was absent from exec JSON and interactive UI rendering remains unverified.",
+        "evidence_ids": [
+          "observation-codex-t20"
+        ]
+      }
+    },
+    {
+      "case_id": "T20-B",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "Display timing before target execution has not been observed.",
+        "evidence_ids": [
+          "probe-claude-t20"
+        ]
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "systemMessage was absent from exec JSON and interactive UI rendering remains unverified.",
+        "evidence_ids": [
+          "observation-codex-t20"
+        ]
+      }
+    },
+    {
+      "case_id": "T20-C",
+      "claude": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "Display fidelity, truncation, and newline handling have not been observed.",
+        "evidence_ids": [
+          "probe-claude-t20"
+        ]
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "systemMessage was absent from exec JSON and interactive UI rendering remains unverified.",
+        "evidence_ids": [
+          "observation-codex-t20"
+        ]
+      }
+    },
+    {
+      "case_id": "T20-D",
+      "claude": {
+        "status": "not_applicable",
+        "coverage_effect": "not_applicable",
+        "reason": "T20-D is the Codex systemMessage reachability case.",
+        "evidence_ids": []
+      },
+      "codex": {
+        "status": "unverified",
+        "coverage_effect": "excluded",
+        "reason": "systemMessage was absent from exec JSON and interactive UI rendering remains unverified.",
+        "evidence_ids": [
+          "observation-codex-t20"
+        ]
+      }
+    }
+  ]
+}

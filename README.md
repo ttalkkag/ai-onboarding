@@ -1,8 +1,10 @@
 # secure-onboard
 
-> 상태: **M0 hook tracer-bullet GO / 전체 M1 NO-GO** — 현재 공식 훅 계약을 기준으로 지원 버전·OS별 실제 입력, deny, result, Stop 동작을 fixture로 고정하는 구현만 착수한다.
+> 상태: **M0 구현·관찰 완료(검증된 보호 coverage 0) / 전체 M1 NO-GO** — macOS arm64의 Claude Code 2.1.220에서는 sentinel 동작과 marker 결과를 관찰했지만 target process observer와 실제 사용자 승인은 검증하지 못했다. Codex CLI 0.146.0은 effective cwd와 result outcome을 native payload로 신뢰할 수 없어 shell action/result coverage에서 제외한다.
 
 Secure Onboard는 외부에서 받은 코드·파일·프로젝트를 다루는 **Claude Code CLI와 Codex CLI의 선택형 로컬 실행 가드레일**이다. 사용자가 AI에 실행·설치·열기·설정·권한 변경·보안 검사를 요청하면 의미를 인식하되, M1에서 실제로 게이트하는 범위는 npm 설치·로컬 파일 열기이고 명시적 읽기 전용 검사를 별도 지원한다. 설정·권한·build/test 같은 요청은 M1에서 `NOT_COVERED`다.
+
+현재 저장소의 실행 가능한 산출물은 실제 npm·파일 분석기가 아니라 test-only M0 compatibility tracer다. 관찰 행렬의 92개 client/case cell 중 `verified`와 coverage `included`는 모두 0이며, M1 제품 보호·설치·배포 기능은 구현하지 않았다.
 
 ## 제품 경계
 
@@ -45,7 +47,7 @@ Claude Code plugin ─┐
 Codex plugin ───────┘
 ```
 
-의도 인식은 사용자 경험을 돕지만 실제 차단의 권위 있는 입력은 `PreToolUse`가 받은 실행 직전 도구 호출이다. 결과 훅은 LOW·INFO 작업의 관찰 가능한 성공·실패 기록에만 사용한다. Claude Code는 성공 `PostToolUse`와 실패 `PostToolUseFailure`, Codex는 `PostToolUse` 결과를 클라이언트 어댑터가 공통 outcome으로 정규화한다.
+의도 인식은 사용자 경험을 돕지만 실제 차단의 권위 있는 입력은 `PreToolUse`가 받은 실행 직전 도구 호출이다. 결과 훅은 LOW·INFO 작업의 관찰 가능한 성공·실패 기록에만 사용한다. Claude Code는 성공 `PostToolUse`와 실패 `PostToolUseFailure`를 공통 outcome으로 정규화한다. Codex는 지원 버전에서 outcome을 신뢰할 수 있는 native 값을 제공할 때만 정규화하며, CLI 0.146.0의 success/failure `tool_response`는 둘 다 빈 문자열이므로 현재 adapter가 거부하고 result coverage에서 제외한다.
 
 저장소에 남아 있는 `.skills/sample`과 `.agents/skills`·`.claude/skills`·`.codex/skills` 링크는 개발 예시이며 Secure Onboard 제품 배포물이 아니다. 제품 구현을 이 공용 스킬 링크에 추가하지 않는다.
 
